@@ -29,14 +29,14 @@ class YoloLoss(nn.Module):
 
         self.obj_mask = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 1,
                                     requires_grad=False)
-        self.true_bbox = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 4)
-        self.true_score = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, self.class_num)
-        self.iou = torch.zeros_like(self.obj_mask)
+        self.true_bbox = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 4, requires_grad=False)
+        self.true_score = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, self.class_num, requires_grad=False)
+        self.iou = torch.zeros_like(self.obj_mask, requires_grad=False)
 
     def __call__(self, iter, pred, target):
         if iter is None:
             raise ValueError("iter can not be none!")
-        need_prior_loss = iter < 12800
+        need_prior_loss = iter < config.anchor_train_iters
 
         cls_score, pred_object = pred
         true_label, true_object = target
