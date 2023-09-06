@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from utils import GetIouBetween
+from utils import GetCenterAlignIouBetween
 import config
 
 
@@ -51,21 +51,20 @@ class YoloLoss(nn.Module):
         # the 5 value of pred_object[...,:] is t_x, t_y, t_w, t_h, iou_pred
         # the 5 value of true_object[...,:] is centroid(x, y), w, h s.t x, y within (0, W) and w, h within (0, H)
         for anchor_ind in range(self.anchor_num):
-            pred_object[..., anchor_ind, :2] = self.sigmoid(pred_object[:, :, :, anchor_ind, :2]) + self.fm_cord[:, :,
-                                                                                                    :2]
-            pred_object[..., anchor_ind, :2] = torch.exp(pred_object[:, :, :, anchor_ind, 2:4]) * self.anchor_box[:, :,
-                                                                                                  anchor_ind, :2]
+            pred_object[..., anchor_ind, :2] = self.sigmoid(pred_object[..., anchor_ind, :2]) + self.fm_cord[..., :2]
+            pred_object[..., anchor_ind, 2:4] = torch.exp(pred_object[..., anchor_ind, 2:4]) * self.anchor_box[..., anchor_ind, :2]
 
         true_object_center_x = torch.ceil(true_object[:, :, 0] / self.fm_width)
         true_object_center_y = torch.ceil(true_object[:, :, 1] / self.fm_height)
-        true_object_center = torch.zeros_like(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 4)
+        # true_object_center = torch.zeros_like(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 4)
 
         for b in range(self.batchsize):
             truebbox_index = 0
             for i, j in true_object_center_x, true_object_center_y:
-                true_object_center[b, i, j, :, :] = true_object[b, truebbox_index, :]
+                # true_object_center[b, i, j, :, :] = true_object[b, truebbox_index, :]
                 for anchor_ind in range(self.anchor_num):
-                    _iou = GetIouBetween(true_object_center[b, i, j, anchor_ind, :], true_object[b, truebbox_index, :])
+                    # FIX ME: calc iou between pred_bbox and true_bbox.
+                    _iou = GetCenterAlignIouBetween(pred_object[b, i, j, anchor_ind, :4], true_object[b, truebbox_index, :])
                     if _iou > self.iou_threshold:
                         self.obj_mask[b, i, j, anchor_ind, 0] = 1
                     self.iou[b, i, j, anchor_ind, 0] = _iou

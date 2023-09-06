@@ -10,6 +10,11 @@ import os
 
 import config
 
+def GetCenterAlignIouBetween(box1, box2):
+    x1, y1, w1, h1 = box1
+    x2, y2, _, _ = box2
+    shift_box1 = torch.Tensor([x2, y2, w1, h1], dtype=torch.float32)
+    return GetIouBetween(shift_box1, box2)
 
 # utils.py
 def GetIouBetween(box1, box2):

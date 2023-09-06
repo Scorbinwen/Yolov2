@@ -2,7 +2,7 @@
 import torch.utils.data
 import torchvision
 from utils import show_image_wbnd
-# from loss import YoloLoss
+from loss import YoloLoss
 from network import Darknet19
 import config
 from utils import save_transformed_data
@@ -44,7 +44,7 @@ test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=config.ba
 
 
 darknet19 = Darknet19()
-# criterion = YoloLoss()
+criterion = YoloLoss()
 learning_rate = config.learning_rate
 optimizer = torch.optim.RMSprop(params=darknet19.parameters(), lr=learning_rate)
 
@@ -56,7 +56,8 @@ for epoch in range(1):
         # show_image_wbnd(image[0], target[0])
         # save_transformed_data(image[0], target[0])
         print(iter)
-        darknet19(image)
+        pred = darknet19(image)
+        loss = criterion(iter + epoch * len(train_dataloader), pred, target)
         """
         pred = darknet19(image)
         loss = criterion(iter + epoch * len(train_dataloader), pred, target)
