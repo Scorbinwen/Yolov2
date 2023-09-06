@@ -13,7 +13,7 @@ import config
 def GetCenterAlignIouBetween(box1, box2):
     x1, y1, w1, h1 = box1
     x2, y2, _, _ = box2
-    shift_box1 = torch.Tensor([x2, y2, w1, h1], dtype=torch.float32)
+    shift_box1 = torch.tensor([x2, y2, w1, h1], dtype=torch.float32)
     return GetIouBetween(shift_box1, box2)
 
 # utils.py
@@ -24,8 +24,8 @@ def GetIouBetween(box1, box2):
     # make sure box1 and box2 are both of float value
     if not isinstance(box1, torch.Tensor) or not isinstance(box2, torch.Tensor):
         raise TypeError("either box1 or box2 is not of Torch.Tensor type")
-    box1 = torch.Tensor(box1, dtype=torch.float32)
-    box2 = torch.Tensor(box2, dtype=torch.float32)
+    box1 = torch.tensor(box1, dtype=torch.float32)
+    box2 = torch.tensor(box2, dtype=torch.float32)
     x1, y1, w1, h1 = box1
     x2, y2, w2, h2 = box2
 

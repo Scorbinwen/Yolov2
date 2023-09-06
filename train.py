@@ -7,8 +7,8 @@ from network import Darknet19
 import config
 from utils import save_transformed_data
 
-
 torch.set_default_device("cuda")
+
 
 import transform as T
 transform = T.Compose([
@@ -55,21 +55,21 @@ for epoch in range(1):
     for iter, (image, target) in enumerate(train_dataloader):
         # show_image_wbnd(image[0], target[0])
         # save_transformed_data(image[0], target[0])
-        print(iter)
+        # print(iter)
         pred = darknet19(image)
+        # print("pre shape", pred[0].shape, pred[1].shape)
+        # print("target shape", len(target[0]), len(target[1]))
+        optimizer.zero_grad()
         loss = criterion(iter + epoch * len(train_dataloader), pred, target)
-        """
-        pred = darknet19(image)
-        loss = criterion(iter + epoch * len(train_dataloader), pred, target)
-        loss.zero_grad()
-        optimizer.step()
         loss.backward()
-
+        optimizer.step()
+        if (iter % config.loss_print_period == 0):
+            print("iter:{} loss:{}:".format(iter, loss.item()))
     with torch.no_grad():
         darknet19.eval()
         for iter, (image, target) in enumerate(test_dataloader):
             pred = darknet19(image)
-        """
+
 
 
 
