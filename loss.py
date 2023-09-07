@@ -60,6 +60,8 @@ class YoloLoss(nn.Module):
         for anchor_ind in range(self.anchor_num):
             pred_object[..., anchor_ind, :2] = self.sigmoid(pred_object[..., anchor_ind, :2]) + self.fm_cord[..., :2]
         # pred h, w
+        print("pred_object[..., 2:4]", pred_object[..., 2:4].shape)
+        print("self.anchor_box[..., :2]", self.anchor_box[..., :2].shape)
         pred_object[..., 2:4] = torch.exp(pred_object[..., 2:4]) * self.anchor_box[..., :2]
 
         # note that the true_object[..., 0:4] value is within [0 ~ 418], we have to downsample it first

@@ -39,8 +39,8 @@ root = "data"
 train_dataset = torchvision.datasets.VOCDetection(root=root,  year="2012", image_set='train', transforms=transform, download=False)
 test_dataset = torchvision.datasets.VOCDetection(root=root,  year="2012", image_set='trainval', transforms=transform, download=False)
 
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config.batch_size, collate_fn=detection_collate)
-test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=config.batch_size, collate_fn=detection_collate)
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config.batch_size, collate_fn=detection_collate, drop_last=True)
+test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=config.batch_size, collate_fn=detection_collate, drop_last=True)
 
 
 darknet19 = Darknet19()
