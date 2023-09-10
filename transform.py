@@ -2,7 +2,7 @@ import torch
 from torchvision.transforms import functional as F
 import torchvision.transforms as T
 import numpy as np
-from utils import show_image_wbnd
+from utils import ShowImageWbnd
 from utils import PasteImageToCanvas
 import config
 
@@ -99,5 +99,5 @@ class ResizeImage(object):
         image, true_object = PasteImageToCanvas(resized_image, true_object, dx, dy, black_canvas, resize_ratio)
 
         target = (origin_target, true_class, true_object)
-        # show_image_wbnd(image, target)
+        # ShowImageWbnd(image, target)
         return image, target

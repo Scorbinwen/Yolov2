@@ -10,11 +10,13 @@ import os
 
 import config
 
+
 def GetCenterAlignIouBetween(box1, box2):
     x1, y1, w1, h1 = box1
     x2, y2, _, _ = box2
     shift_box1 = torch.tensor([x2, y2, w1, h1], dtype=torch.float32)
     return GetIouBetween(shift_box1, box2)
+
 
 # utils.py
 def GetIouBetween(box1, box2):
@@ -56,32 +58,35 @@ def GetIouBetween(box1, box2):
     return iou
 
 
-def show_image_wbnd(image=None, target=None):
-    """
-    Sample image and boxes
-    image = torch.randint(0, 255, (3, 418, 418), dtype=torch.uint8)
-    boxes = torch.tensor([[50, 50, 100, 200], [210, 150, 350, 400]], dtype=torch.float)
-    """
-    # expect shape of image is (3, W, H), and dtype is torch.uint8
-    if image.dim == 4:
-        image = image[0]
-        target = target[0]
+def DrawWithPred(image, target):
     image = image * config.image_normalize_scale
     image = torch.tensor(image, dtype=torch.uint8)
     # image = torch.Tensor(image, dtype=torch.uint8)
-    _, _, true_object = target
-    boxes = torch.zeros_like(true_object)
+    true_class, true_object = target
+    if len(true_object) == 0:
+        return
+    boxes = torch.zeros_like(true_object[..., :4])
+    print("true_object1", true_object[..., :2].shape)
+    print("true_object2", true_object[..., 2:4].shape)
     # true_object value is within (0, 13)
-    boxes[..., :2] = true_object[..., :2] - (.5 * true_object[..., 2:])
-    boxes[..., 2:] = true_object[..., :2] + (.5 * true_object[..., 2:])
-    boxes = boxes
-    result = draw_bounding_boxes(image, boxes=boxes, width=5)
+    boxes[..., :2] = true_object[..., :2] - (.5 * true_object[..., 2:4])
+    boxes[..., 2:] = true_object[..., :2] + (.5 * true_object[..., 2:4])
+    print(boxes)
+    labels = []
+    for cls_ind in true_class:
+        labels.append(config.ClsIdToName[cls_ind.item()])
+    result = draw_bounding_boxes(image, boxes=boxes, labels=labels, width=5)
+    return result
+
+
+def ShowImageWbnd(image, target):
+    result = DrawWithPred(image, target)
     trans_to_pil = transforms.ToPILImage(mode="RGB")
     img_pil = trans_to_pil(result)
     img_pil.show()
 
 
-def write_xml(xml_name, save_name, box, resize_w, resize_h):
+def WriteXml(xml_name, save_name, box, resize_w, resize_h):
     """
     将修改后的box 写入到 xml文件中
     :param xml_name: 原xml
@@ -104,9 +109,10 @@ def write_xml(xml_name, save_name, box, resize_w, resize_h):
     etree.write(save_name)
 
 
-def save_transformed_data(image, target, root=config.data_root, save_width=config.input_width, save_height=config.input_height):
+def SaveTransformedData(image, target, root=config.data_root, save_width=config.input_width,
+                        save_height=config.input_height):
     origin_target, true_cls, true_object = target
-    # show_image_wbnd(image, target)
+    # ShowImageWbnd(image, target)
     true_object[..., :2] = true_object[..., :2] - .5 * true_object[..., 2:]
     true_object[..., 2:] = true_object[..., :2] + .5 * true_object[..., 2:]
     folder = origin_target['annotation']['folder']
@@ -115,7 +121,7 @@ def save_transformed_data(image, target, root=config.data_root, save_width=confi
     xml_subfolder = "ResizedAnnotations"
     image_path = os.path.join(root, folder, img_subfolder, filename)
     xml_path = os.path.join(root, folder, xml_subfolder, filename.split(".")[0] + ".xml")
-    write_xml(xml_path, xml_path, true_object, save_width, save_height)
+    WriteXml(xml_path, xml_path, true_object, save_width, save_height)
     image = image.permute(1, 2, 0).cpu()
     image = image.numpy()
     image = (image * config.image_normalize_scale).astype(np.uint8)
@@ -123,7 +129,7 @@ def save_transformed_data(image, target, root=config.data_root, save_width=confi
     image.save(image_path)
 
 
-def PasteImageToCanvas(image,true_object, dx, dy, canvas, resize_ratio):
+def PasteImageToCanvas(image, true_object, dx, dy, canvas, resize_ratio):
     """
     :param image:
     :param dx:
@@ -137,13 +143,73 @@ def PasteImageToCanvas(image,true_object, dx, dy, canvas, resize_ratio):
     _, imgheight, imgwidth = image.shape
 
     if (cvsheight - 2 * dy == imgheight) and (cvswidth - 2 * dx == imgwidth):
-        canvas[:, dy:cvsheight-dy, dx:cvswidth-dx] = image
+        canvas[:, dy:cvsheight - dy, dx:cvswidth - dx] = image
     else:  # handle for odd (cvsheight - imgheight) case.
         ddy = cvsheight - 2 * dy - imgheight
         ddx = cvswidth - 2 * dx - imgwidth
-        canvas[:, dy:cvsheight-(dy+ddy), dx:cvswidth-(dx+ddx)] = image
+        canvas[:, dy:cvsheight - (dy + ddy), dx:cvswidth - (dx + ddx)] = image
     true_object[..., 0] = true_object[..., 0] * resize_ratio + dx
     true_object[..., 1] = true_object[..., 1] * resize_ratio + dy
     true_object[..., 2] = true_object[..., 2] * resize_ratio
     true_object[..., 3] = true_object[..., 3] * resize_ratio
     return canvas, true_object
+
+
+def SortByConf(same_cls_object):
+    same_cls_conf = same_cls_object[..., 4]
+    sorted_index = torch.argsort(same_cls_conf, dim=-1, descending=True)
+    same_cls_object = same_cls_object[sorted_index]
+    return same_cls_object
+
+
+def RmvAtIndex(object_list, index):
+    return torch.cat((object_list[:index, ...], object_list[(index + 1):, ...]), dim=0)
+
+
+def NMSbyConf(pred):
+    cls_score, pred_object = pred
+    # expect   cls_score shape: [13, 13, 4, 20]
+    # expect pred_object shape: [13, 13, 4, (4 + 1)]
+    candiate_index = torch.where(pred_object[..., 4] > config.iou_threshold)
+    # expect candiate_index : [x1, x2, x3, ...], [y1, y2, y3, ...], [z1, z2, z3, ...]
+    # expect max_score_index shape: [13, 13, 4]
+    max_score_index = torch.argmax(cls_score[candiate_index], dim=-1)
+    # pred_object shape: [num_object, 5]
+    pred_object = pred_object[candiate_index]
+
+    result_object = []
+    result_class = []
+    for cls_ind in range(config.class_num):
+        same_cls_index = torch.where(max_score_index == cls_ind)
+        # object tensor list of the same class
+        same_cls_object = pred_object[same_cls_index]
+        same_cls_object = SortByConf(same_cls_object)
+
+        while len(same_cls_object) > 0:
+            # cherry_pick_object is the maximum
+            cherry_pick_object = same_cls_object[0, ...]
+            same_cls_object = RmvAtIndex(same_cls_object, 0)
+            for i, obj in enumerate(same_cls_object):
+                iou = GetIouBetween(cherry_pick_object[:4], obj[:4])
+                # suppression
+                if iou > config.nms_iou_threshold:
+                    # remove obj from same_cls_object
+                    same_cls_object = RmvAtIndex(same_cls_object, i)
+            # pick cherry_pick_object to result_object
+            result_object.append(cherry_pick_object)
+            result_class.append(cls_ind)
+    if len(result_object) == 0 or len(result_class) == 0:
+        return torch.tensor([]), torch.tensor([])
+    result_object = torch.stack(result_object)
+    result_class = torch.tensor(result_class)
+    return result_class, result_object
+
+
+sigmoid = torch.nn.Sigmoid()
+
+
+def MapPredCordBackToInputSize(pred_object):
+    pred_object[..., :2] = sigmoid(pred_object[..., :2]) + config.fm_cord[..., None, :2]
+    pred_object[..., 2:4] = sigmoid(pred_object[..., 2:4]) * config.output_width
+    pred_object[..., :4] = pred_object[..., :4] * config.downsample_rate
+    return pred_object

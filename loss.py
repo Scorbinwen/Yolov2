@@ -4,7 +4,6 @@ from utils import GetCenterAlignIouBetween
 import config
 
 
-# 由于网上关于yolov2的Loss形式各异，因此这里研究Darknet19的源码forward.c
 class YoloLoss(nn.Module):
     def __init__(self):
         super(YoloLoss, self).__init__()
@@ -20,10 +19,7 @@ class YoloLoss(nn.Module):
         self.sigmoid = torch.nn.Sigmoid()
         self.downsample_rate = config.downsample_rate
 
-        x = torch.range(0, self.fm_width - 1, requires_grad=False, device="cuda")
-        y = torch.range(0, self.fm_height - 1, requires_grad=False, device="cuda")
-        x_cord, y_cord = torch.meshgrid(x, y)
-        self.fm_cord = torch.concat((x_cord[..., None], y_cord[..., None]), dim=-1)
+        self.fm_cord = config.fm_cord
 
         self.anchor_box = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 2,
                                       requires_grad=False)
@@ -36,8 +32,6 @@ class YoloLoss(nn.Module):
         self.iou = torch.zeros_like(self.obj_mask, requires_grad=False)
 
     def __call__(self, iter, pred, target):
-        if iter is None:
-            raise ValueError("iter can not be none!")
         need_prior_loss = iter < config.anchor_train_iters
 
         cls_score, pred_object = pred
@@ -60,13 +54,7 @@ class YoloLoss(nn.Module):
         for anchor_ind in range(self.anchor_num):
             pred_object[..., anchor_ind, :2] = self.sigmoid(pred_object[..., anchor_ind, :2]) + self.fm_cord[..., :2]
         # pred h, w
-        print("pred_object[..., 2:4]", pred_object[..., 2:4].shape)
-        print("self.anchor_box[..., :2]", self.anchor_box[..., :2].shape)
-        pred_object[..., 2:4] = torch.exp(pred_object[..., 2:4]) * self.anchor_box[..., :2]
-
-        # note that the true_object[..., 0:4] value is within [0 ~ 418], we have to downsample it first
-
-        # true_object_center = torch.zeros_like(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 4)
+        pred_object[..., 2:4] = self.sigmoid(pred_object[..., 2:4]) * self.fm_width
 
         for b in range(self.batchsize):
             # print("b", b)
