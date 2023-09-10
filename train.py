@@ -55,7 +55,7 @@ criterion = YoloLoss()
 learning_rate = config.learning_rate
 optimizer = torch.optim.RMSprop(params=darknet19.parameters(), lr=learning_rate)
 
-for epoch in range(500):
+for epoch in range(config.train_epochs):
     darknet19.train()
     for iter, (image, target) in enumerate(train_dataloader):
         pred = darknet19(image)

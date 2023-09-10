@@ -27,7 +27,7 @@ image_normalize_scale = 256
 flip_prob = 0.5
 data_root = "data\\VOCdevkit"
 dataroot = "data"
-learning_rate = 1e-4
+learning_rate = 1e-3
 anchor_box = \
     [[0.08285376, 0.13705531],
      [0.20850361, 0.39420716],
@@ -47,3 +47,4 @@ path_to_state_dict = 'ModelPth\\state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
+train_epochs = 800
