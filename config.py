@@ -13,8 +13,8 @@ ClsIdToName = \
      15: 'pottedplant', 16: 'sheep', 17: 'sofa', 18: 'train', 19: 'tvmonitor'}
 class_num = len(NameToClsId) + 1  # 1 denotes no object
 batch_size = 16
-input_width = 418
-input_height = 418
+input_width = 416
+input_height = 416
 class_num = 20
 anchor_num = 4
 output_width = 13
@@ -43,11 +43,6 @@ x = torch.arange(0, output_width, requires_grad=False, device="cuda")
 y = torch.arange(0, output_height, requires_grad=False, device="cuda")
 x_cord, y_cord = torch.meshgrid(x, y)
 fm_cord = torch.concat((x_cord[..., None], y_cord[..., None]), dim=-1)
-
-fm_limit_width = 13 - torch.abs(13 - torch.arange(1, 27, 2, requires_grad=False, device="cuda"))
-fm_limit_height = 13 - torch.abs(13 - torch.arange(1, 27, 2, requires_grad=False, device="cuda"))
-fm_limit_width, fm_limit_height = torch.meshgrid(fm_limit_width, fm_limit_height)
-fm_size_limit = torch.concat((fm_limit_width[..., None], fm_limit_height[..., None]), dim=-1)
 
 
 path_to_state_dict = 'ModelPth\\state_dict_model.pth'

@@ -72,10 +72,10 @@ for epoch in range(config.train_epochs):
         cls_score_to_show = cls_score[0, ...]
         image_to_show = image[0]
         pred_object_to_show = pred_object[0, ...]
-        MapPredCordBackToInputSize(pred_object_to_show)
+        pred_object_to_show = MapPredCordBackToInputSize(pred_object_to_show)
         pred_to_show = cls_score_to_show, pred_object_to_show
         target = NMSbyConf(pred_to_show)
         img = DrawWithPred(image_to_show, target)
-        writer.add_image("pred_result", img, 1, dataformats='CHW')
-        # ShowImageWbnd(image_to_show, target)
+        # writer.add_image("pred_result", img, 1, dataformats='CHW')
+        ShowImageWbnd(image_to_show, target)
 writer.close()

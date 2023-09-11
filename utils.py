@@ -210,6 +210,8 @@ sigmoid = torch.nn.Sigmoid()
 
 def MapPredCordBackToInputSize(pred_object):
     pred_object[..., :2] = sigmoid(pred_object[..., :2]) + config.fm_cord[..., None, :2]
-    pred_object[..., 2:4] = sigmoid(pred_object[..., 2:4]) * config.fm_size_limit[..., None, :2]
+    fm_center = config.output_width / 2
+    fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
+    pred_object[..., 2:4] = sigmoid(pred_object[..., 2:4]) * fm_size_limit[..., :2]
     pred_object[..., :4] = pred_object[..., :4] * config.downsample_rate
     return pred_object

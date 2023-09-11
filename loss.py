@@ -18,9 +18,8 @@ class YoloLoss(nn.Module):
         self.scale_obj = config.scale_obj
         self.sigmoid = torch.nn.Sigmoid()
         self.downsample_rate = config.downsample_rate
-
         self.fm_cord = config.fm_cord
-        self.fm_size_limit = config.fm_size_limit
+
         self.anchor_box = torch.zeros(self.batchsize, self.fm_width, self.fm_height, self.anchor_num, 2,
                                       requires_grad=False)
         self.anchor_box[..., :, :] = torch.Tensor(config.anchor_box) * self.fm_width
@@ -48,7 +47,9 @@ class YoloLoss(nn.Module):
         # the 5 value of true_object[...,:] is centroid(x, y), w, h s.t x, y within (0, W) and w, h within (0, H)
         # pred center x, y
         pred_object[..., :2] = self.sigmoid(pred_object[..., :2]) + self.fm_cord[..., None, :2]
-        pred_object[..., 2:4] = self.sigmoid(pred_object[..., 2:4]) * self.fm_size_limit[..., None, :2]
+        fm_center = self.fm_width / 2
+        fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
+        pred_object[..., 2:4] = self.sigmoid(pred_object[..., 2:4]) * fm_size_limit[..., :2]
         # pred h, w
 
         pred_object[..., 4] = self.sigmoid(pred_object[..., 4])
