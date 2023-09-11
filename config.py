@@ -33,7 +33,7 @@ anchor_box = \
      [0.20850361, 0.39420716],
      [0.80552421, 0.77665105],
      [0.42194719, 0.62385487]]
-anchor_train_iters = 12800
+anchor_train_epochs = 10
 # note that we assume the input_width equals to input_height
 downsample_rate = input_width // output_width
 loss_print_period = 10
@@ -43,8 +43,17 @@ x = torch.arange(0, output_width, requires_grad=False, device="cuda")
 y = torch.arange(0, output_height, requires_grad=False, device="cuda")
 x_cord, y_cord = torch.meshgrid(x, y)
 fm_cord = torch.concat((x_cord[..., None], y_cord[..., None]), dim=-1)
+
+fm_limit_width = 13 - torch.abs(13 - torch.arange(1, 27, 2, requires_grad=False, device="cuda"))
+fm_limit_height = 13 - torch.abs(13 - torch.arange(1, 27, 2, requires_grad=False, device="cuda"))
+fm_limit_width, fm_limit_height = torch.meshgrid(fm_limit_width, fm_limit_height)
+fm_size_limit = torch.concat((fm_limit_width[..., None], fm_limit_height[..., None]), dim=-1)
+
+
 path_to_state_dict = 'ModelPth\\state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
 train_epochs = 800
+weight_decay = 0.0005
+momentum = 0.9

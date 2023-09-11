@@ -52,8 +52,7 @@ if os.path.exists(config.path_to_state_dict):
     darknet19.load_state_dict(torch.load(config.path_to_state_dict))
 
 criterion = YoloLoss()
-learning_rate = config.learning_rate
-optimizer = torch.optim.RMSprop(params=darknet19.parameters(), lr=learning_rate)
+optimizer = torch.optim.SGD(params=darknet19.parameters(), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.weight_decay)
 
 for epoch in range(config.train_epochs):
     darknet19.train()
