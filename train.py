@@ -51,6 +51,6 @@ for epoch in range(config.train_epochs):
         pred_to_show = cls_score_to_show, pred_object_to_show
         target = NMSbyConf(pred_to_show)
         img = DrawWithPred(image_to_show, target)
-        writer.add_image("pred_result", img, 1, dataformats='CHW')
-        # ShowImageWbnd(img)
+        writer.add_image("pred_result", img, 0, dataformats='CHW')
+        #ShowImageWbnd(img)
 writer.close()
