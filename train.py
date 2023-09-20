@@ -1,72 +1,47 @@
 import torch.utils.data
 import torchvision
 from loss import YoloLoss
-from network import Darknet19
+from network import *
 import config
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter(config.tensorboard_logs)
 
 torch.set_default_device(config.default_device)
-import transform as T
-
-transform = T.Compose([
-    T.ConvertImageToTrainableData(),
-    T.ResizeImage(config.input_width, config.input_height),
-    T.RandomHorizontalFlip(0.5, config.input_width),
-])
+from dataset import *
+train_dataloader, test_dataloader = GetDummyDataDataLoader()
 
 
-def detection_collate(batch):
-    """Custom collate fn for dealing with batches of images that have a different
-    number of associated object annotations (bounding boxes).
-    Arguments:
-        batch: (tuple) A tuple of tensor images and lists of annotations
-    Return:
-        A tuple containing:
-            1) (tensor) batch of images stacked on their 0 dim
-            2) (list of tensors) annotations for a given image are stacked on
-                                 0 dim
-    """
-    targets = []
-    imgs = []
-    for sample in batch:
-        imgs.append(sample[0])
-        targets.append(sample[1])
-    return torch.stack(imgs, 0), targets
+model = DarkNet53()
+criterion = YoloLoss()
+optimizer = torch.optim.RMSprop(params=model.parameters(), lr=config.learning_rate)
 
-
-train_dataset = torchvision.datasets.VOCDetection(root=config.dataroot, year="2012", image_set='train', transforms=transform,
-                                                  download=False)
-test_dataset = torchvision.datasets.VOCDetection(root=config.dataroot, year="2012", image_set='trainval', transforms=transform,
-                                                 download=False)
-
-train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config.batch_size,
-                                               collate_fn=detection_collate, drop_last=True)
-test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=config.batch_size,
-                                              collate_fn=detection_collate, drop_last=True)
-
-darknet19 = Darknet19()
 if os.path.exists(config.path_to_state_dict):
     print("loading model state dict...")
-    darknet19.load_state_dict(torch.load(config.path_to_state_dict))
-
-criterion = YoloLoss()
-optimizer = torch.optim.SGD(params=darknet19.parameters(), lr=config.learning_rate, momentum=config.momentum, weight_decay=config.weight_decay)
+    checkpoint = torch.load(config.path_to_state_dict)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
 for epoch in range(config.train_epochs):
-    darknet19.train()
+    model.train()
     for iter, (image, target) in enumerate(train_dataloader):
-        pred = darknet19(image)
+        pred = model(image)
         optimizer.zero_grad()
-        loss = criterion(iter + epoch * len(train_dataloader), pred, target)
+        loss, noobj_loss, obj_loss, prior_loss, true_loss, score_loss = criterion(iter + epoch * len(train_dataloader), pred, target)
         loss.backward()
         optimizer.step()
         if (iter + epoch * len(train_dataloader)) % config.loss_print_period == 0:
             writer.add_scalar("loss", loss, iter + epoch * len(train_dataloader))
-            print("epoch:{} iter:{} loss:{}:".format(epoch, iter, loss.item()))
+            print("epoch:{} iter:{} total_loss:{}: noobj_loss:{}, obj_loss:{}, prior_loss:{}, true_loss:{}, score_loss:{}"
+                  "".format(epoch, iter, loss.item(), noobj_loss.item(), obj_loss.item(), prior_loss.item(), true_loss.item(), score_loss.item()))
     # save state_dict every epoch
-    torch.save(darknet19.state_dict(), config.path_to_state_dict)
+    torch.save({
+        'epoch': epoch,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'loss': loss,
+    }, config.path_to_state_dict)
+
     with torch.no_grad():
         cls_score, pred_object = pred
         cls_score_to_show = cls_score[0, ...]
@@ -76,6 +51,6 @@ for epoch in range(config.train_epochs):
         pred_to_show = cls_score_to_show, pred_object_to_show
         target = NMSbyConf(pred_to_show)
         img = DrawWithPred(image_to_show, target)
-        # writer.add_image("pred_result", img, 1, dataformats='CHW')
-        ShowImageWbnd(image_to_show, target)
+        writer.add_image("pred_result", img, 1, dataformats='CHW')
+        # ShowImageWbnd(img)
 writer.close()

@@ -7,8 +7,8 @@ import config
 class YoloLoss(nn.Module):
     def __init__(self):
         super(YoloLoss, self).__init__()
-        self.fm_width = config.output_width
-        self.fm_height = config.output_height
+        self.fm_width = config.output_size
+        self.fm_height = config.output_size
         self.anchor_num = config.anchor_num
         self.class_num = config.class_num
         self.batchsize = config.batch_size
@@ -16,7 +16,6 @@ class YoloLoss(nn.Module):
         self.mse_loss = torch.nn.MSELoss(reduce=False)
         self.scale_noobj = config.scale_noobj
         self.scale_obj = config.scale_obj
-        self.sigmoid = torch.nn.Sigmoid()
         self.downsample_rate = config.downsample_rate
         self.fm_cord = config.fm_cord
 
@@ -43,16 +42,7 @@ class YoloLoss(nn.Module):
 
         cls_score = torch.reshape(cls_score, [-1, self.fm_width, self.fm_height, self.anchor_num, self.class_num])
         pred_object = torch.reshape(pred_object, [-1, self.fm_width, self.fm_height, self.anchor_num, 5])
-        # the 5 value of pred_object[...,:] is t_x, t_y, t_w, t_h, iou_pred
-        # the 5 value of true_object[...,:] is centroid(x, y), w, h s.t x, y within (0, W) and w, h within (0, H)
-        # pred center x, y
-        pred_object[..., :2] = self.sigmoid(pred_object[..., :2]) + self.fm_cord[..., None, :2]
-        fm_center = self.fm_width / 2
-        fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
-        pred_object[..., 2:4] = self.sigmoid(pred_object[..., 2:4]) * fm_size_limit[..., :2]
         # pred h, w
-
-        pred_object[..., 4] = self.sigmoid(pred_object[..., 4])
 
         for b in range(self.batchsize):
             _, true_label, true_object = target[b]
@@ -64,7 +54,7 @@ class YoloLoss(nn.Module):
                 for anchor_ind in range(self.anchor_num):
                     _iou = GetCenterAlignIouBetween(pred_object[b, i, j, anchor_ind, :4],
                                                     true_object[truebbox_index, :])
-                    # print("_iou", _iou)
+                    # print("anchor_ind:{} _iou:{}".format(anchor_ind, _iou))
                     if _iou > self.iou_threshold:
                         self.obj_mask[b, i, j, anchor_ind] = 1
                         self.iou[b, i, j, anchor_ind] = _iou
@@ -89,7 +79,7 @@ class YoloLoss(nn.Module):
                                                                                               self.true_bbox[..., :4]))
 
         # class loss with no obj_mask, so that the network can learn no object.
-        score_loss = torch.mean(self.scale_obj * .5 * self.mse_loss(cls_score, self.true_score))
+        score_loss = torch.mean(self.scale_obj * .5 * self.obj_mask[..., None] * self.mse_loss(cls_score, self.true_score))
         # the loss may drop suddenly at iter 12800
         total_loss = (noobj_loss + obj_loss + prior_loss + true_loss + score_loss) / 4.
-        return total_loss
+        return total_loss, noobj_loss / 4., obj_loss / 4., prior_loss / 4., true_loss / 4., score_loss / 4.

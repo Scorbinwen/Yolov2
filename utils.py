@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 import torchvision.transforms.functional as F
 import torchvision.transforms as transforms
 import os
+import random
 
 import config
 
@@ -24,8 +25,6 @@ def GetIouBetween(box1, box2):
     # expect box2 :centeroid(x, y), w, h,
     # convert centorid x, y to topleft x, y and bottomright x, y
     # make sure box1 and box2 are both of float value
-    if not isinstance(box1, torch.Tensor) or not isinstance(box2, torch.Tensor):
-        raise TypeError("either box1 or box2 is not of Torch.Tensor type")
     box1 = torch.tensor(box1, dtype=torch.float32)
     box2 = torch.tensor(box2, dtype=torch.float32)
     x1, y1, w1, h1 = box1
@@ -64,14 +63,14 @@ def DrawWithPred(image, target):
     # image = torch.Tensor(image, dtype=torch.uint8)
     true_class, true_object = target
     if len(true_object) == 0:
-        return
+        return image
     boxes = torch.zeros_like(true_object[..., :4])
-    print("true_object1", true_object[..., :2].shape)
-    print("true_object2", true_object[..., 2:4].shape)
+    # print("true_object1", true_object[..., :2].shape)
+    # print("true_object2", true_object[..., 2:4].shape)
     # true_object value is within (0, 13)
     boxes[..., :2] = true_object[..., :2] - (.5 * true_object[..., 2:4])
     boxes[..., 2:] = true_object[..., :2] + (.5 * true_object[..., 2:4])
-    print(boxes)
+    # print(boxes)
     labels = []
     for cls_ind in true_class:
         labels.append(config.ClsIdToName[cls_ind.item()])
@@ -79,10 +78,9 @@ def DrawWithPred(image, target):
     return result
 
 
-def ShowImageWbnd(image, target):
-    result = DrawWithPred(image, target)
+def ShowImageWbnd(image):
     trans_to_pil = transforms.ToPILImage(mode="RGB")
-    img_pil = trans_to_pil(result)
+    img_pil = trans_to_pil(image)
     img_pil.show()
 
 
@@ -109,8 +107,7 @@ def WriteXml(xml_name, save_name, box, resize_w, resize_h):
     etree.write(save_name)
 
 
-def SaveTransformedData(image, target, root=config.data_root, save_width=config.input_width,
-                        save_height=config.input_height):
+def SaveTransformedData(image, target):
     origin_target, true_cls, true_object = target
     # ShowImageWbnd(image, target)
     true_object[..., :2] = true_object[..., :2] - .5 * true_object[..., 2:]
@@ -119,9 +116,9 @@ def SaveTransformedData(image, target, root=config.data_root, save_width=config.
     filename = origin_target['annotation']['filename']
     img_subfolder = "ResizedJPEGImages"
     xml_subfolder = "ResizedAnnotations"
-    image_path = os.path.join(root, folder, img_subfolder, filename)
-    xml_path = os.path.join(root, folder, xml_subfolder, filename.split(".")[0] + ".xml")
-    WriteXml(xml_path, xml_path, true_object, save_width, save_height)
+    image_path = os.path.join(config.data_root, folder, img_subfolder, filename)
+    xml_path = os.path.join(config.data_root, folder, xml_subfolder, filename.split(".")[0] + ".xml")
+    WriteXml(xml_path, xml_path, true_object, config.input_width, config.input_height)
     image = image.permute(1, 2, 0).cpu()
     image = image.numpy()
     image = (image * config.image_normalize_scale).astype(np.uint8)
@@ -168,13 +165,8 @@ def RmvAtIndex(object_list, index):
 
 def NMSbyConf(pred):
     cls_score, pred_object = pred
-    # expect   cls_score shape: [13, 13, 4, 20]
-    # expect pred_object shape: [13, 13, 4, (4 + 1)]
     candiate_index = torch.where(pred_object[..., 4] > config.iou_threshold)
-    # expect candiate_index : [x1, x2, x3, ...], [y1, y2, y3, ...], [z1, z2, z3, ...]
-    # expect max_score_index shape: [13, 13, 4]
     max_score_index = torch.argmax(cls_score[candiate_index], dim=-1)
-    # pred_object shape: [num_object, 5]
     pred_object = pred_object[candiate_index]
 
     result_object = []
@@ -205,13 +197,22 @@ def NMSbyConf(pred):
     return result_class, result_object
 
 
-sigmoid = torch.nn.Sigmoid()
-
-
 def MapPredCordBackToInputSize(pred_object):
-    pred_object[..., :2] = sigmoid(pred_object[..., :2]) + config.fm_cord[..., None, :2]
-    fm_center = config.output_width / 2
-    fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
-    pred_object[..., 2:4] = sigmoid(pred_object[..., 2:4]) * fm_size_limit[..., :2]
     pred_object[..., :4] = pred_object[..., :4] * config.downsample_rate
     return pred_object
+
+def RandomGenerateBbox(object_list):
+    # bbox size range from 1/4 * 416 = 104  to 3/8 * 416 = 156
+    # randomly generate circle
+    # randomly pick a size
+    pick_size = random.randint(config.dummy_lower_limit, config.dummy_upper_limit)
+    pick_x = random.randint(pick_size, config.input_height - pick_size)
+    pick_y = random.randint(pick_size, config.input_height - pick_size)
+    iouflag = False
+    # newly generated bbox should not be overlapped with previous bboxes
+    for bbox in object_list:
+        iou = GetIouBetween([pick_x, pick_y, pick_size, pick_size], bbox)
+        if iou != 0:
+            iouflag = True
+            break
+    return pick_x, pick_y, pick_size, iouflag

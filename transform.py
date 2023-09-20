@@ -48,7 +48,7 @@ class ConvertImageToTrainableData(object):
 
 
 class RandomHorizontalFlip(object):
-    def __init__(self, flip_prob=config.flip_prob, fm_width=config.output_width):
+    def __init__(self, flip_prob=config.flip_prob, fm_width=config.output_size):
         self.flip_prop = flip_prob
         self.fm_width = fm_width
 

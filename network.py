@@ -2,56 +2,105 @@ import torch.nn as nn
 from collections import OrderedDict
 import config
 import torch
+import torch.nn.functional as F
 
-class Darknet19(nn.Module):
+class ConvolutionalLayer(nn.Module):
+    def __init__(self, in_channels, out_channels, kernal_size, stride, padding):
+        super(ConvolutionalLayer, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernal_size, stride, padding),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(0.1)
+        )
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+# 残差块结构
+class ResidualLayer(nn.Module):
+    def __init__(self, in_channels):
+        super(ResidualLayer, self).__init__()
+        self.reseblock = nn.Sequential(
+            ConvolutionalLayer(in_channels, in_channels // 2, kernal_size=1, stride=1, padding=0),
+            ConvolutionalLayer(in_channels // 2, in_channels, kernal_size=3, stride=1, padding=1)
+        )
+
+    def forward(self, x):
+        return x + self.reseblock(x)
+
+class wrapLayer(nn.Module):
+    def __init__(self, in_channels, count):
+        super(wrapLayer, self).__init__()
+        self.count = count
+        self.in_channels = in_channels
+        self.res = ResidualLayer(self.in_channels)
+
+    def forward(self, x):
+        for i in range(0, self.count):
+            x = self.res(x)
+        return x
+
+
+class DownSampleLayer(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(DownSampleLayer, self).__init__()
+        self.conv = nn.Sequential(
+            ConvolutionalLayer(in_channels, out_channels, kernal_size=3, stride=2, padding=1)
+        )
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+class DarkNet53(nn.Module):
     def __init__(self):
-        super(Darknet19, self).__init__()
+        super(DarkNet53, self).__init__()
         self.class_num = config.class_num
         self.anchor_num = config.anchor_num
-        self.fm_width = config.output_width
-        self.fm_height = config.output_height
-        # FIX ME: Add BN and shortCut for model
-        network_list = [
-            ('conv1', nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1)),
-            ('pool1', nn.MaxPool2d(2, stride=2)),
-            ('conv2', nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1)),
-            ('pool2', nn.MaxPool2d(2, stride=2)),
-            ('conv3_1', nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)),
-            ('conv3_2', nn.Conv2d(128, 64, kernel_size=1, stride=1)),
-            ('conv3_3', nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)),
-            ('pool3', nn.MaxPool2d(2, stride=2)),
-            ('conv4_1', nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)),
-            ('conv4_2', nn.Conv2d(256, 128, kernel_size=1, stride=1)),
-            ('conv4_3', nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)),
-            ('pool4', nn.MaxPool2d(2, stride=2)),
-            ('conv5_1', nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)),
-            ('conv5_2', nn.Conv2d(512, 256, kernel_size=1, stride=1)),
-            ('conv5_3', nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)),
-            ('conv5_4', nn.Conv2d(512, 256, kernel_size=1, stride=1)),
-            ('conv5_5', nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)),
-            ('pool5', nn.MaxPool2d(2, stride=2)),
-            ('conv6_1', nn.Conv2d(512, 1024, kernel_size=3, stride=1, padding=1)),
-            ('conv6_2', nn.Conv2d(1024, 512, kernel_size=1, stride=1)),
-            ('conv6_3', nn.Conv2d(512, 1024, kernel_size=3, stride=1, padding=1)),
-            ('conv6_4', nn.Conv2d(1024, 512, kernel_size=1, stride=1)),
-            ('conv6_5', nn.Conv2d(512, 1024, kernel_size=3, stride=1, padding=1)),
-            ('conv7', nn.Conv2d(1024, 1000, kernel_size=1, stride=1)),
-            ('pool7', nn.AvgPool2d(kernel_size=3, stride=1, padding=1)),
-        ]
-        self.model = nn.Sequential(OrderedDict(network_list))
-        self.cls_head = nn.Sequential(OrderedDict([
-            ('cls_head_conv', nn.Conv2d(1000, self.anchor_num * self.class_num, kernel_size=1, stride=1)),
-            ('cls_head_softmax', nn.Softmax(dim=-1)),
-        ]))
+        self.fm_width = config.output_size
+        self.fm_height = config.output_size
+        self.feature_52 = nn.Sequential(
+            ConvolutionalLayer(3, 32, 3, 1, 1),
+            DownSampleLayer(32, 64),
+            ResidualLayer(64),
+            DownSampleLayer(64, 128),
+            wrapLayer(128, 2),
+            DownSampleLayer(128, 256),
+            wrapLayer(256, 8)
+        )
+        self.feature_26 = nn.Sequential(
+            DownSampleLayer(256, 512),
+            wrapLayer(512, 8)
+        )
+        self.feature_13 = nn.Sequential(
+            DownSampleLayer(512, 1024),
+            wrapLayer(1024, 4)
+        )
+        self.cls_head = nn.Sequential(
+            nn.Conv2d(1024, self.anchor_num * self.class_num, kernel_size=1, stride=1),
+            nn.Softmax(dim=-1),
+        )
 
-        self.reg_head = nn.Sequential(OrderedDict([
-            ('reg_head', nn.Conv2d(1000, self.anchor_num * 5, kernel_size=1, stride=1)),
-        ]))
+        self.reg_head = nn.Sequential(
+            nn.Conv2d(1024, self.anchor_num * 5, kernel_size=1, stride=1),
+        )
+        self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, input):
-        featuremap = self.model(input)
-        cls_score = self.cls_head(featuremap)
-        cls_score = torch.reshape(cls_score, (-1, self.fm_width, self.fm_height, self.anchor_num,  self.class_num))
-        pred_cord = self.reg_head(featuremap)
-        pred_cord = torch.reshape(pred_cord, (-1, self.fm_width, self.fm_height, self.anchor_num,  5))
-        return cls_score, pred_cord
+    def forward(self, x):
+        h_52 = self.feature_52(x)
+        h_26 = self.feature_26(h_52)
+        h_13 = self.feature_13(h_26)
+
+        cls_score = self.cls_head(h_13)
+        cls_score = torch.reshape(cls_score, (-1, self.fm_width, self.fm_height, self.anchor_num, self.class_num))
+        pred_object = self.reg_head(h_13)
+        pred_object = torch.reshape(pred_object, (-1, self.fm_width, self.fm_height, self.anchor_num, 5))
+
+        pred_object[..., :2] = self.sigmoid(pred_object[..., :2]) + config.fm_cord[..., None, :2]
+        fm_center = config.output_size / 2
+        fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
+        pred_object[..., 2:4] = self.sigmoid(pred_object[..., 2:4]) * fm_size_limit[..., :2]
+        pred_object[..., 4] = self.sigmoid(pred_object[..., 4])
+
+        return cls_score, pred_object

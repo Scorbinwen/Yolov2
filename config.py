@@ -12,16 +12,15 @@ ClsIdToName = \
      10: 'diningtable', 11: 'dog', 12: 'horse', 13: 'motorbike', 14: 'person',
      15: 'pottedplant', 16: 'sheep', 17: 'sofa', 18: 'train', 19: 'tvmonitor'}
 class_num = len(NameToClsId) + 1  # 1 denotes no object
-batch_size = 16
+batch_size = 8
 input_width = 416
 input_height = 416
 class_num = 20
 anchor_num = 4
-output_width = 13
-output_height = 13
+output_size = 13
 anchor_num = 4
-iou_threshold = 0.6
-scale_noobj = 0.05
+iou_threshold = 0.8
+scale_noobj = 0.006
 scale_obj = 1.0
 image_normalize_scale = 256
 flip_prob = 0.5
@@ -33,14 +32,14 @@ anchor_box = \
      [0.20850361, 0.39420716],
      [0.80552421, 0.77665105],
      [0.42194719, 0.62385487]]
-anchor_train_epochs = 10
+anchor_train_epochs = 0
 # note that we assume the input_width equals to input_height
-downsample_rate = input_width // output_width
+downsample_rate = input_width // output_size
 loss_print_period = 10
-nms_iou_threshold = 0.7
+nms_iou_threshold = 0.5
 
-x = torch.arange(0, output_width, requires_grad=False, device="cuda")
-y = torch.arange(0, output_height, requires_grad=False, device="cuda")
+x = torch.arange(0, output_size, requires_grad=False, device="cuda")
+y = torch.arange(0, output_size, requires_grad=False, device="cuda")
 x_cord, y_cord = torch.meshgrid(x, y)
 fm_cord = torch.concat((x_cord[..., None], y_cord[..., None]), dim=-1)
 
@@ -52,3 +51,7 @@ tensorboard_logs = './logs'
 train_epochs = 800
 weight_decay = 0.0005
 momentum = 0.9
+
+dummy_lower_limit = 100
+dummy_upper_limit = 126
+dummy_dataset_len = 16
