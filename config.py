@@ -48,7 +48,7 @@ path_to_state_dict = 'ModelPth\\state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
-train_epochs = 800
+train_epochs = 5000
 weight_decay = 0.0005
 momentum = 0.9
 
