@@ -79,13 +79,13 @@ class DarkNet53(nn.Module):
         )
         self.cls_head = nn.Sequential(
             nn.Conv2d(1024, self.anchor_num * self.class_num, kernel_size=1, stride=1),
-            nn.Softmax(dim=-1),
         )
 
         self.reg_head = nn.Sequential(
             nn.Conv2d(1024, self.anchor_num * 5, kernel_size=1, stride=1),
         )
         self.sigmoid = torch.nn.Sigmoid()
+        self.softmax = torch.nn.Softmax(dim=-1)
 
     def forward(self, x):
         h_52 = self.feature_52(x)
@@ -94,6 +94,7 @@ class DarkNet53(nn.Module):
 
         cls_score = self.cls_head(h_13)
         cls_score = torch.reshape(cls_score, (-1, self.fm_width, self.fm_height, self.anchor_num, self.class_num))
+        cls_score = self.softmax(cls_score)
         pred_object = self.reg_head(h_13)
         pred_object = torch.reshape(pred_object, (-1, self.fm_width, self.fm_height, self.anchor_num, 5))
 

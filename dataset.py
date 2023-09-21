@@ -21,19 +21,20 @@ class DummyDataset(Dataset):
 
         target_cls = []
         target_object = []
-
-        pick_circle_x, pick_circle_y, pick_circle_size, iouflag = RandomGenerateBbox(target_object)
-        if iouflag == False:
-            cv2.circle(counters, (pick_circle_x, pick_circle_y), pick_circle_size // 2, (255, 255, 0), -1)
-            target_object.append(torch.tensor([pick_circle_x, pick_circle_y, pick_circle_size, pick_circle_size]))
-            target_cls.append(torch.tensor(0))
-
-        pick_rect_x, pick_rect_y, pick_rect_size, iouflag = RandomGenerateBbox(target_object)
-        if iouflag == False:
-            cv2.rectangle(counters, (pick_rect_x - pick_rect_size // 2, pick_rect_y - pick_rect_size // 2),
-                          (pick_rect_x + pick_rect_size // 2, pick_rect_y + pick_rect_size // 2), (125, 0, 125), -1)
-            target_object.append(torch.tensor([pick_rect_x, pick_rect_y, pick_rect_size, pick_rect_size]))
-            target_cls.append(torch.tensor(1))
+        rect_or_circle = random.randint(0, 1)
+        if (rect_or_circle == 0):
+            pick_circle_x, pick_circle_y, pick_circle_size, iouflag = RandomGenerateBbox(target_object)
+            if iouflag == False:
+                cv2.circle(counters, (pick_circle_x, pick_circle_y), pick_circle_size // 2, (255, 255, 0), -1)
+                target_object.append(torch.tensor([pick_circle_x, pick_circle_y, pick_circle_size, pick_circle_size]))
+                target_cls.append(torch.tensor(0))
+        else:
+            pick_rect_x, pick_rect_y, pick_rect_size, iouflag = RandomGenerateBbox(target_object)
+            if iouflag == False:
+                cv2.rectangle(counters, (pick_rect_x - pick_rect_size // 2, pick_rect_y - pick_rect_size // 2),
+                              (pick_rect_x + pick_rect_size // 2, pick_rect_y + pick_rect_size // 2), (125, 0, 125), -1)
+                target_object.append(torch.tensor([pick_rect_x, pick_rect_y, pick_rect_size, pick_rect_size]))
+                target_cls.append(torch.tensor(1))
 
         # transform image & target
         target_cls = torch.stack(target_cls)
@@ -70,7 +71,7 @@ def GetVOCDetectionDataLoader():
 
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=config.batch_size,
                                                    collate_fn=detection_collate, drop_last=True)
-    test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=config.batch_size,
+    test_dataloader = torch.utils.data.DataLoader(test_dataset, batch_size=config.test_batch_size,
                                                   collate_fn=detection_collate, drop_last=True)
     return train_dataloader, test_dataloader
 
@@ -83,6 +84,6 @@ def GetDummyDataDataLoader():
     # 数据迭代器
     train_dataloader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=config.batch_size,
                                                    collate_fn=detection_collate, drop_last=True)
-    test_dataloader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=config.batch_size,
+    test_dataloader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=config.test_batch_size,
                                                    collate_fn=detection_collate, drop_last=True)
     return train_dataloader, test_dataloader

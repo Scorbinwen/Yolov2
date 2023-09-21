@@ -79,7 +79,7 @@ class YoloLoss(nn.Module):
                                                                                               self.true_bbox[..., :4]))
 
         # class loss with no obj_mask, so that the network can learn no object.
-        score_loss = torch.mean(self.scale_obj * .5 * self.obj_mask[..., None] * self.mse_loss(cls_score, self.true_score))
+        score_loss = torch.mean(self.scale_obj * .5 * self.mse_loss(cls_score, self.true_score))
         # the loss may drop suddenly at iter 12800
         total_loss = (noobj_loss + obj_loss + prior_loss + true_loss + score_loss) / 4.
         return total_loss, noobj_loss / 4., obj_loss / 4., prior_loss / 4., true_loss / 4., score_loss / 4.

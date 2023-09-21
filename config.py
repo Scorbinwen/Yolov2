@@ -11,14 +11,13 @@ ClsIdToName = \
      5: 'bus', 6: 'car', 7: 'cat', 8: 'chair', 9: 'cow',
      10: 'diningtable', 11: 'dog', 12: 'horse', 13: 'motorbike', 14: 'person',
      15: 'pottedplant', 16: 'sheep', 17: 'sofa', 18: 'train', 19: 'tvmonitor'}
-class_num = len(NameToClsId) + 1  # 1 denotes no object
+class_num = 2 + 1  # 1 denotes no object
 batch_size = 8
+test_batch_size = 1
 input_width = 416
 input_height = 416
-class_num = 20
 anchor_num = 4
 output_size = 13
-anchor_num = 4
 iou_threshold = 0.8
 scale_noobj = 0.006
 scale_obj = 1.0
@@ -36,7 +35,7 @@ anchor_train_epochs = 0
 # note that we assume the input_width equals to input_height
 downsample_rate = input_width // output_size
 loss_print_period = 10
-nms_iou_threshold = 0.5
+nms_iou_threshold = 0.7
 
 x = torch.arange(0, output_size, requires_grad=False, device="cuda")
 y = torch.arange(0, output_size, requires_grad=False, device="cuda")
@@ -48,10 +47,10 @@ path_to_state_dict = 'ModelPth\\state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
-train_epochs = 5000
+train_epochs = 1500
 weight_decay = 0.0005
 momentum = 0.9
 
-dummy_lower_limit = 100
-dummy_upper_limit = 126
+dummy_lower_limit = 230
+dummy_upper_limit = 276
 dummy_dataset_len = 16

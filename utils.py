@@ -206,8 +206,8 @@ def RandomGenerateBbox(object_list):
     # randomly generate circle
     # randomly pick a size
     pick_size = random.randint(config.dummy_lower_limit, config.dummy_upper_limit)
-    pick_x = random.randint(pick_size, config.input_height - pick_size)
-    pick_y = random.randint(pick_size, config.input_height - pick_size)
+    pick_x = random.randint(pick_size // 2, config.input_height - pick_size // 2)
+    pick_y = random.randint(pick_size // 2, config.input_height - pick_size // 2)
     iouflag = False
     # newly generated bbox should not be overlapped with previous bboxes
     for bbox in object_list:
