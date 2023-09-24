@@ -29,13 +29,15 @@ def train():
         for iter, (image, target) in enumerate(train_dataloader):
             pred = model(image)
             optimizer.zero_grad()
-            loss, noobj_loss, obj_loss, prior_loss, true_loss, score_loss = criterion(iter + epoch * len(train_dataloader), pred, target)
+            loss, noobj_loss, obj_loss, score_loss, true_loss_xy, true_loss_wh = criterion(iter + epoch * len(train_dataloader), pred, target)
             loss.backward()
             optimizer.step()
             if (iter + epoch * len(train_dataloader)) % config.loss_print_period == 0:
                 writer.add_scalar("loss", loss, iter + epoch * len(train_dataloader))
-                print("epoch:{} iter:{} total_loss:{}: noobj_loss:{}, obj_loss:{}, prior_loss:{}, true_loss:{}, score_loss:{}"
-                      "".format(epoch, iter, loss.item(), noobj_loss.item(), obj_loss.item(), prior_loss.item(), true_loss.item(), score_loss.item()))
+                print("epoch:{} iter:{} total_loss:{}: noobj_loss:{}, obj_loss:{}, score_loss:{}, true_loss_xy:{}, "
+                      "true_loss_wh:{}".
+                      format(epoch, iter, loss.item(), noobj_loss.item(), obj_loss.item(),
+                             score_loss.item(), true_loss_xy.item(), true_loss_wh.item()))
         # save state_dict every epoch.
         s = signal.signal(signal.SIGINT, signal.SIG_IGN)
         torch.save({
@@ -47,7 +49,7 @@ def train():
         signal.signal(signal.SIGINT, s)
 
         with torch.no_grad():
-            cls_score, pred_object = pred
+            cls_out, cls_score, pred_object = pred
             cls_score_to_show = cls_score[0, ...]
             image_to_show = image[0]
             pred_object_to_show = pred_object[0, ...]
@@ -70,7 +72,7 @@ def eval():
         for iter, (image, target) in enumerate(test_dataloader):
                 print("image shape", image.shape)
                 pred = model(image)
-                cls_score, pred_object = pred
+                cls_out, cls_score, pred_object = pred
                 cls_score_to_show = cls_score[0, ...]
                 image_to_show = image[0]
                 pred_object_to_show = pred_object[0, ...]
@@ -82,4 +84,4 @@ def eval():
                 ShowImageWbnd(img)
 
 
-eval()
+train()

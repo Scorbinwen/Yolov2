@@ -2,7 +2,9 @@ import torch.nn as nn
 from collections import OrderedDict
 import config
 import torch
+import numpy as np
 import torch.nn.functional as F
+
 
 class ConvolutionalLayer(nn.Module):
     def __init__(self, in_channels, out_channels, kernal_size, stride, padding):
@@ -28,6 +30,7 @@ class ResidualLayer(nn.Module):
 
     def forward(self, x):
         return x + self.reseblock(x)
+
 
 class wrapLayer(nn.Module):
     def __init__(self, in_channels, count):
@@ -86,11 +89,18 @@ class DarkNet53(nn.Module):
         )
         self.sigmoid = torch.nn.Sigmoid()
         self.softmax = torch.nn.Softmax(dim=-1)
+        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.conv = nn.Conv2d(1024, config.class_num, kernel_size=1, stride=1)
 
     def forward(self, x):
         h_52 = self.feature_52(x)
         h_26 = self.feature_26(h_52)
         h_13 = self.feature_13(h_26)
+
+        cls_out = self.conv(h_13)
+        cls_out = self.global_avg_pool(cls_out)
+        cls_out = cls_out.view(-1, config.class_num)
+        cls_out = self.softmax(cls_out)
 
         cls_score = self.cls_head(h_13)
         cls_score = torch.reshape(cls_score, (-1, self.fm_width, self.fm_height, self.anchor_num, self.class_num))
@@ -100,8 +110,13 @@ class DarkNet53(nn.Module):
 
         pred_object[..., :2] = self.sigmoid(pred_object[..., :2]) + config.fm_cord[..., None, :2]
         fm_center = config.output_size / 2
-        fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
+        with torch.no_grad():
+            fm_size_limit = 2 * (fm_center - torch.abs(pred_object[..., :2] - fm_center))
+
         pred_object[..., 2:4] = self.sigmoid(pred_object[..., 2:4]) * fm_size_limit[..., :2]
         pred_object[..., 4] = self.sigmoid(pred_object[..., 4])
 
-        return cls_score, pred_object
+        index = torch.where((pred_object[..., 0] >= 4) & (pred_object[..., 0] <= 8) & (pred_object[..., 1] >= 4) & (
+                    pred_object[..., 1] <= 8))
+        print("pred_object", pred_object[index])
+        return cls_out, cls_score, pred_object

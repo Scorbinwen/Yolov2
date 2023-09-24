@@ -74,7 +74,7 @@ def DrawWithPred(image, target):
     labels = []
     for cls_ind in true_class:
         labels.append(config.ClsIdToName[cls_ind.item()])
-    result = draw_bounding_boxes(image, boxes=boxes, labels=labels, width=5)
+    result = draw_bounding_boxes(image, boxes=boxes, labels=labels, colors=(255, 0, 0), width=5)
     return result
 
 
@@ -165,10 +165,9 @@ def RmvAtIndex(object_list, index):
 
 def NMSbyConf(pred):
     cls_score, pred_object = pred
-    candiate_index = torch.where(pred_object[..., 4] > config.iou_threshold)
+    candiate_index = torch.where(pred_object[..., 4] > 0.9)
     max_score_index = torch.argmax(cls_score[candiate_index], dim=-1)
     pred_object = pred_object[candiate_index]
-
     result_object = []
     result_class = []
     for cls_ind in range(config.class_num):
@@ -208,6 +207,13 @@ def RandomGenerateBbox(object_list):
     pick_size = random.randint(config.dummy_lower_limit, config.dummy_upper_limit)
     pick_x = random.randint(pick_size // 2, config.input_height - pick_size // 2)
     pick_y = random.randint(pick_size // 2, config.input_height - pick_size // 2)
+    # pick = random.randint(0, 1)
+    # if pick == 0:
+    #     pick_x = 130
+    #     pick_y = 130
+    # else:
+    #     pick_x = 200
+    #     pick_y = 200
     iouflag = False
     # newly generated bbox should not be overlapped with previous bboxes
     for bbox in object_list:
@@ -216,3 +222,10 @@ def RandomGenerateBbox(object_list):
             iouflag = True
             break
     return pick_x, pick_y, pick_size, iouflag
+
+
+def GetTargetToShow(target):
+    _, true_label, true_object = target
+    _true_object = torch.ones(1, 5)
+    _true_object[..., :4] = true_object
+    return true_label, _true_object
