@@ -17,7 +17,7 @@ class DummyDataset(Dataset):
         return config.dummy_dataset_len
 
     def __getitem__(self, index):
-        counters = np.zeros((config.input_height, config.input_width, 3), dtype=np.uint8)
+        counters = np.zeros((config.input_size, config.input_size, 3), dtype=np.uint8)
 
         target_cls = []
         target_object = []
@@ -50,8 +50,8 @@ class DummyDataset(Dataset):
 
 transform = T.Compose([
     T.ConvertImageToTrainableData(),
-    T.ResizeImage(config.input_width, config.input_height),
-    T.RandomHorizontalFlip(0.5, config.input_width),
+    T.ResizeImage(config.input_size, config.input_size),
+    T.RandomHorizontalFlip(0.5, config.input_size),
 ])
 
 

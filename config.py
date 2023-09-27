@@ -16,9 +16,8 @@ ClsIdToName = \
 class_num = 2 + 1  # 1 denotes no object
 batch_size = 8
 test_batch_size = 1
-input_width = 416
-input_height = 416
-anchor_num = 4
+input_size = 416
+anchor_num = 5
 output_size = 13
 iou_threshold = 0.5
 scale_noobj = 0.2
@@ -31,16 +30,17 @@ learning_rate = 1e-4
 is_dummydata = True
 
 if is_dummydata:
-    dummy_lower_limit = 200
-    dummy_upper_limit = 260
+    dummy_lower_limit = 100
+    dummy_upper_limit = 120
     dummy_dataset_len = 5000
-    step = (dummy_upper_limit - dummy_lower_limit) / 32 / 3
+    step = (dummy_upper_limit - dummy_lower_limit) / 32 / 4
     start_size = dummy_lower_limit / 32
     anchor_box = \
         [[start_size, start_size],
          [start_size + step, start_size + step],
          [start_size + 2 * step, start_size + 2 * step],
-         [start_size + 3 * step, start_size + 3 * step]]
+         [start_size + 3 * step, start_size + 3 * step],
+         [start_size + 4 * step, start_size + 4 * step]]
 else:
     anchor_box = \
         [[0.08285376, 0.13705531],
@@ -49,8 +49,8 @@ else:
          [0.42194719, 0.62385487]]
 
 anchor_train_epochs = 3
-# note that we assume the input_width equals to input_height
-downsample_rate = input_width // output_size
+# note that we assume the input_size equals to input_size
+downsample_rate = input_size // output_size
 loss_print_period = 10
 nms_iou_threshold = 0.5
 
@@ -63,9 +63,17 @@ path_to_state_dict = 'ModelPth\\state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
-train_epochs = 10
+train_epochs = 50
+lr_epoch=[100, 150]
+wp_epoch=1
 weight_decay = 5e-4
 momentum = 0.9
 
 train_detection = True
 show_pred_every_iter = False
+head_dim = 1024
+no_warm_up=False
+reorg_dim=64
+
+pretrained_backbone=True
+backbone_state_dict = "ModelPth\\darknet19.pth"

@@ -118,7 +118,7 @@ def SaveTransformedData(image, target):
     xml_subfolder = "ResizedAnnotations"
     image_path = os.path.join(config.data_root, folder, img_subfolder, filename)
     xml_path = os.path.join(config.data_root, folder, xml_subfolder, filename.split(".")[0] + ".xml")
-    WriteXml(xml_path, xml_path, true_object, config.input_width, config.input_height)
+    WriteXml(xml_path, xml_path, true_object, config.input_size, config.input_size)
     image = image.permute(1, 2, 0).cpu()
     image = image.numpy()
     image = (image * config.image_normalize_scale).astype(np.uint8)
@@ -205,15 +205,13 @@ def RandomGenerateBbox(object_list):
     # randomly generate circle
     # randomly pick a size
     pick_size = random.randint(config.dummy_lower_limit, config.dummy_upper_limit)
-    pick_x = random.randint(pick_size // 2, config.input_height - pick_size // 2)
-    pick_y = random.randint(pick_size // 2, config.input_height - pick_size // 2)
-    # pick = random.randint(0, 1)
-    # if pick == 0:
-    #     pick_x = 130
-    #     pick_y = 130
-    # else:
-    #     pick_x = 200
-    #     pick_y = 200
+    # pick_x = random.randint(pick_size // 2, config.input_size - pick_size // 2)
+    # pick_y = random.randint(pick_size // 2, config.input_size - pick_size // 2)
+
+    # pick_x = random.randint(192, 224)
+    # pick_y = random.randint(192, 224)
+    pick_x = 200
+    pick_y = 200
     iouflag = False
     # newly generated bbox should not be overlapped with previous bboxes
     for bbox in object_list:
@@ -229,3 +227,15 @@ def GetTargetToShow(target):
     _true_object = torch.ones(1, 5)
     _true_object[..., :4] = true_object
     return true_label, _true_object
+
+
+def DrawWithPredResult(pred, image):
+    conf, pred_xy, pred_wh, cls_score, cls_out = pred
+    cls_score_to_show = cls_score[0, ...]
+    image_to_show = image[0]
+    pred_object_to_show = pred_xy[0, ...] + pred_wh[0, ...]
+    pred_object_to_show = MapPredCordBackToInputSize(pred_object_to_show)
+    pred_to_show = cls_score_to_show, pred_object_to_show
+    target = NMSbyConf(pred_to_show)
+    img = DrawWithPred(image_to_show, target)
+    return img
