@@ -82,6 +82,7 @@ class DarkNet_19(nn.Module):
             Conv_BN_LeakyReLU(1024, 512, 1),
             Conv_BN_LeakyReLU(512, 1024, 3, 1),
         )
+        self.first = True
 
     def forward(self, x):
         """
@@ -106,6 +107,14 @@ class DarkNet_19(nn.Module):
             'c4': c4,
             'c5': c5
         }
+        # if (self.first == True):
+        #     # print("running mean shape:{} val:{}".format(self.conv_1[0].convs[1].running_mean.shape,
+        #     #                                             self.conv_1[0].convs[1].running_mean))
+        #     # print("running var  shape:{} val:{}".format(self.conv_1[0].convs[1].running_var.shape,
+        #     #                                             self.conv_1[0].convs[1].running_var))
+        #     np.savetxt('c5.csv',
+        #                c5.view(-1, 1024 * 13 * 13).detach().cpu().numpy(), fmt='%.2f', delimiter=',')
+        #     self.first = False
         return output
 
 
@@ -179,13 +188,15 @@ class Yolov2(nn.Module):
         # 预测层
         self.pred = nn.Conv2d(config.head_dim, self.num_anchors * (1 + 4 + self.num_classes), 1)
 
-        self.classifier = nn.Sequential(
-            nn.Conv2d(config.head_dim, config.class_num, kernel_size=1),
-            nn.AdaptiveAvgPool2d((1, 1)),
-        )
+        # self.classifier = nn.Sequential(
+        #     nn.Conv2d(config.head_dim, config.class_num, kernel_size=1),
+        #     nn.AdaptiveAvgPool2d((1, 1)),
+        # )
         self.softmax = nn.Softmax(dim=-1)
+        self.first = True
 
-    def train(self):
+    def train(self, mode):
+        super(Yolov2, self).train(mode)
         print("init bias...")
         self.init_bias()
 
@@ -201,10 +212,8 @@ class Yolov2(nn.Module):
         # backbone主干网络
         feats = self.backbone(x)
         c4, c5 = feats['c4'], feats['c5']
-
         # 处理c5特征
         p5 = self.convsets_1(c5)
-
         # 融合c4特征
         p4 = self.reorg(self.route_layer(c4))
         p5 = torch.cat([p4, p5], dim=1)
@@ -214,28 +223,43 @@ class Yolov2(nn.Module):
 
         # 预测
         prediction = self.pred(p5)
-        prediction = prediction.view(-1, config.output_size, config.output_size, self.num_anchors * (1 + 4 + self.num_classes))
-        print("prediction", prediction.shape)
-        # prediction: [batch_size, 13, 13, self.num_anchors * (1 + 4 + self.num_classes)]
+        prediction = prediction.permute(0, 2, 3, 1).contiguous().view(-1, config.output_size, config.output_size,
+                                     self.num_anchors * (1 + 4 + self.num_classes))
+
         conf = prediction[..., :self.num_anchors]
-        conf = conf.view(-1, config.output_size, config.output_size, self.num_anchors, 1)
+        conf = conf.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors, 1)
         conf = self.sigmoid(conf)
 
-        pred_xy = prediction[..., self.num_anchors:3 * self.num_anchors]
-        pred_xy = pred_xy.view(-1, config.output_size, config.output_size, self.num_anchors, 2)
-        print("pred_xy shape", pred_xy.shape)
-        print("config.fm_cord shape", config.fm_cord.shape)
+        cls_score = prediction[..., self.num_anchors:(self.num_classes + 1) * self.num_anchors]
+        cls_score = cls_score.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors,
+                                                self.num_classes)
+        if (self.first == True):
+            # print("running mean shape:{} val:{}".format(self.conv_1[0].convs[1].running_mean.shape,
+            #                                             self.conv_1[0].convs[1].running_mean))
+            # print("running var  shape:{} val:{}".format(self.conv_1[0].convs[1].running_var.shape,
+            #                                             self.conv_1[0].convs[1].running_var))
+            np.savetxt('prediction.csv',
+                       prediction.view(-1, config.output_size * config.output_size *
+                                       self.num_anchors * (1 + 4 + self.num_classes)).detach().cpu().numpy(),
+                                        fmt='%.2f', delimiter=',')
+            np.savetxt('cls_pred.csv',
+                       cls_score.view(-1, config.output_size * config.output_size * self.num_anchors *
+                                                self.num_classes).detach().cpu().numpy(),
+                       fmt='%.2f', delimiter=',')
+            self.first = False
+        pred_xy = prediction[..., (self.num_classes + 1) * self.num_anchors:
+                                  (self.num_classes + 1) * self.num_anchors + 2 * self.num_anchors]
+        pred_xy = pred_xy.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors, 2)
         pred_xy = self.sigmoid(pred_xy) + config.fm_cord[..., None, :2]
 
-        pred_wh = prediction[..., 3 * self.num_anchors:5 * self.num_anchors]
-        pred_wh = pred_wh.view(-1, config.output_size, config.output_size, self.num_anchors, 2)
-        print("pred_wh shape", pred_wh.shape)
-        print("config.anchor_box shape", torch.tensor(config.anchor_box).shape)
+        pred_wh = prediction[..., (self.num_classes + 1) * self.num_anchors + 2 * self.num_anchors:]
+        pred_wh = pred_wh.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors, 2)
         pred_wh = torch.exp(pred_wh) * torch.tensor(config.anchor_box)
 
-        cls_score = prediction[..., 5 * self.num_anchors:]
-        cls_score = cls_score.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors, self.num_classes)
-        print("cls_score", cls_score.shape)
-        cls_out = self.classifier(p5)
-        cls_out = cls_out.view(-1, self.num_classes)
+        # print("prediction", prediction)
+        # cls_out = self.classifier(p5)
+        # cls_out = cls_out.view(-1, self.num_classes)
+        # cls_out = self.softmax(cls_out)
+        cls_out = None
         return conf, pred_xy, pred_wh, cls_score, cls_out
+

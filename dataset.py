@@ -22,6 +22,7 @@ class DummyDataset(Dataset):
         target_cls = []
         target_object = []
         rect_or_circle = random.randint(0, 1)
+        # rect_or_circle = 0
         if (rect_or_circle == 0):
             pick_circle_x, pick_circle_y, pick_circle_size, iouflag = RandomGenerateBbox(target_object)
             if iouflag == False:

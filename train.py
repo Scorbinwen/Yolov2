@@ -36,14 +36,13 @@ def train():
         checkpoint = torch.load(config.path_to_state_dict)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-
     tmp_lr = config.learning_rate
     base_lr = config.learning_rate
+    model.train(True)
     for epoch in range(config.train_epochs):
         if epoch in config.lr_epoch:
             tmp_lr = tmp_lr * 0.1
             set_lr(optimizer, tmp_lr)
-        model.train()
         for iter, (image, target) in enumerate(train_dataloader):
             ni = iter+epoch*len(train_dataloader)
             # 使用warm-up策略来调整早期的学习率
@@ -52,7 +51,7 @@ def train():
                     nw = config.wp_epoch*len(train_dataloader)
                     tmp_lr = base_lr * pow((ni)*1. / (nw), 4)
                     set_lr(optimizer, tmp_lr)
-
+                    print("tmp_lr", tmp_lr)
                 elif epoch == config.wp_epoch and iter == 0:
                     tmp_lr = base_lr
                     set_lr(optimizer, tmp_lr)
@@ -69,7 +68,6 @@ def train():
                       "true_loss_wh:{}".
                       format(epoch, iter, loss.item(), noobj_loss.item(), obj_loss.item(),
                              score_loss.item(), true_loss_xy.item(), true_loss_wh.item()))
-
         # UpdateLearningRate(optimizer)
         # save state_dict every epoch.
         s = signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -81,10 +79,10 @@ def train():
         }, config.path_to_state_dict)
         signal.signal(signal.SIGINT, s)
 
-        with torch.no_grad():
-            img = DrawWithPredResult(pred, image)
-            # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
-            # ShowImageWbnd(img)
+        # with torch.no_grad():
+        #     img = DrawWithPredResult(pred, image)
+        #     # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
+        #     ShowImageWbnd(img)
     writer.close()
 
 
@@ -96,10 +94,10 @@ def eval():
     model.eval()
     with torch.no_grad():
         for iter, (image, target) in enumerate(test_dataloader):
-            print("image shape", image.shape)
-            pred = model(image)
-            img = DrawWithPredResult(pred, image)
-            # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
-            ShowImageWbnd(img)
+            with torch.no_grad():
+                pred = model(image)
+                img = DrawWithPredResult(pred, image)
+                # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
+                ShowImageWbnd(img)
 
 train()

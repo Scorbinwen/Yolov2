@@ -14,7 +14,7 @@ ClsIdToName = \
      10: 'diningtable', 11: 'dog', 12: 'horse', 13: 'motorbike', 14: 'person',
      15: 'pottedplant', 16: 'sheep', 17: 'sofa', 18: 'train', 19: 'tvmonitor'}
 class_num = 2 + 1  # 1 denotes no object
-batch_size = 8
+batch_size = 1
 test_batch_size = 1
 input_size = 416
 anchor_num = 5
@@ -26,12 +26,12 @@ image_normalize_scale = 256
 flip_prob = 0.5
 data_root = "data\\VOCdevkit"
 dataroot = "data"
-learning_rate = 1e-4
+learning_rate = 1e-7
 is_dummydata = True
 
 if is_dummydata:
-    dummy_lower_limit = 100
-    dummy_upper_limit = 120
+    dummy_lower_limit = 200
+    dummy_upper_limit = 260
     dummy_dataset_len = 5000
     step = (dummy_upper_limit - dummy_lower_limit) / 32 / 4
     start_size = dummy_lower_limit / 32
@@ -59,12 +59,12 @@ y = torch.arange(0, output_size, requires_grad=False, device="cuda")
 x_cord, y_cord = torch.meshgrid(x, y)
 fm_cord = torch.concat((x_cord[..., None], y_cord[..., None]), dim=-1)
 
-path_to_state_dict = 'ModelPth\\state_dict_model.pth'
+path_to_state_dict = 'ModelPth/state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
 train_epochs = 50
-lr_epoch=[100, 150]
+lr_epoch=[10, 50]
 wp_epoch=1
 weight_decay = 5e-4
 momentum = 0.9
@@ -72,7 +72,7 @@ momentum = 0.9
 train_detection = True
 show_pred_every_iter = False
 head_dim = 1024
-no_warm_up=False
+no_warm_up=True
 reorg_dim=64
 
 pretrained_backbone=True

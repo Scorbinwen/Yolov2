@@ -165,7 +165,9 @@ def RmvAtIndex(object_list, index):
 
 def NMSbyConf(pred):
     cls_score, pred_object = pred
-    candiate_index = torch.where(pred_object[..., 4] > 0.9)
+    print("pred_object conf max", torch.max(pred_object[..., 4]))
+    candiate_index = torch.where(pred_object[..., 4] > 0.8)
+    print("candiate_index", candiate_index)
     max_score_index = torch.argmax(cls_score[candiate_index], dim=-1)
     pred_object = pred_object[candiate_index]
     result_object = []
@@ -205,13 +207,14 @@ def RandomGenerateBbox(object_list):
     # randomly generate circle
     # randomly pick a size
     pick_size = random.randint(config.dummy_lower_limit, config.dummy_upper_limit)
-    # pick_x = random.randint(pick_size // 2, config.input_size - pick_size // 2)
-    # pick_y = random.randint(pick_size // 2, config.input_size - pick_size // 2)
+    # pick_size = 260
+    pick_x = random.randint(pick_size // 2, config.input_size - pick_size // 2)
+    pick_y = random.randint(pick_size // 2, config.input_size - pick_size // 2)
 
     # pick_x = random.randint(192, 224)
     # pick_y = random.randint(192, 224)
-    pick_x = 200
-    pick_y = 200
+    # pick_x = 220
+    # pick_y = 200
     iouflag = False
     # newly generated bbox should not be overlapped with previous bboxes
     for bbox in object_list:
@@ -233,7 +236,7 @@ def DrawWithPredResult(pred, image):
     conf, pred_xy, pred_wh, cls_score, cls_out = pred
     cls_score_to_show = cls_score[0, ...]
     image_to_show = image[0]
-    pred_object_to_show = pred_xy[0, ...] + pred_wh[0, ...]
+    pred_object_to_show = torch.cat((pred_xy[0, ...], pred_wh[0, ...], conf[0, ...]), dim=-1)
     pred_object_to_show = MapPredCordBackToInputSize(pred_object_to_show)
     pred_to_show = cls_score_to_show, pred_object_to_show
     target = NMSbyConf(pred_to_show)
