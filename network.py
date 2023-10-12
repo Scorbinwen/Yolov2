@@ -164,8 +164,9 @@ def build_darknet19(pretrained=False):
 
 
 class Yolov2(nn.Module):
-    def __init__(self):
+    def __init__(self, trainable=False):
         super(Yolov2, self).__init__()
+        self.trainable = trainable
         self.input_size = config.input_size
         self.num_classes = config.class_num
         self.num_anchors = config.anchor_num
@@ -195,10 +196,8 @@ class Yolov2(nn.Module):
         self.softmax = nn.Softmax(dim=-1)
         self.first = True
 
-    def train(self, mode):
-        super(Yolov2, self).train(mode)
-        print("init bias...")
-        self.init_bias()
+        if self.trainable:
+            self.init_bias()
 
     def init_bias(self):
         # init bias
@@ -233,20 +232,7 @@ class Yolov2(nn.Module):
         cls_score = prediction[..., self.num_anchors:(self.num_classes + 1) * self.num_anchors]
         cls_score = cls_score.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors,
                                                 self.num_classes)
-        if (self.first == True):
-            # print("running mean shape:{} val:{}".format(self.conv_1[0].convs[1].running_mean.shape,
-            #                                             self.conv_1[0].convs[1].running_mean))
-            # print("running var  shape:{} val:{}".format(self.conv_1[0].convs[1].running_var.shape,
-            #                                             self.conv_1[0].convs[1].running_var))
-            np.savetxt('prediction.csv',
-                       prediction.view(-1, config.output_size * config.output_size *
-                                       self.num_anchors * (1 + 4 + self.num_classes)).detach().cpu().numpy(),
-                                        fmt='%.2f', delimiter=',')
-            np.savetxt('cls_pred.csv',
-                       cls_score.view(-1, config.output_size * config.output_size * self.num_anchors *
-                                                self.num_classes).detach().cpu().numpy(),
-                       fmt='%.2f', delimiter=',')
-            self.first = False
+
         pred_xy = prediction[..., (self.num_classes + 1) * self.num_anchors:
                                   (self.num_classes + 1) * self.num_anchors + 2 * self.num_anchors]
         pred_xy = pred_xy.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors, 2)
@@ -255,7 +241,31 @@ class Yolov2(nn.Module):
         pred_wh = prediction[..., (self.num_classes + 1) * self.num_anchors + 2 * self.num_anchors:]
         pred_wh = pred_wh.contiguous().view(-1, config.output_size, config.output_size, self.num_anchors, 2)
         pred_wh = torch.exp(pred_wh) * torch.tensor(config.anchor_box)
-
+        if (self.first == True):
+            # for name, param in self.pred.named_parameters():
+            #     print("name:{} param:{}".format(name, param))
+            # print("running mean shape:{} val:{}".format(self.conv_1[0].convs[1].running_mean.shape,
+            #                                             self.conv_1[0].convs[1].running_mean))
+            # print("running var  shape:{} val:{}".format(self.conv_1[0].convs[1].running_var.shape,
+            #                                             self.conv_1[0].convs[1].running_var))
+            np.savetxt('prediction.csv',
+                       prediction.view(-1, config.output_size * config.output_size *
+                                       self.num_anchors * (1 + 4 + self.num_classes)).detach().cpu().numpy(),
+                                        fmt='%.8f', delimiter=',')
+            np.savetxt('c5.csv',
+                       c5.view(-1, 13 * 13 * 1024).detach().cpu().numpy(),
+                       fmt='%.8f', delimiter=',')
+            np.savetxt('c4.csv',
+                       c4.view(-1, 26 * 26 * 512).detach().cpu().numpy(),
+                       fmt='%.8f', delimiter=',')
+            np.savetxt('p5.csv',
+                       p5.view(-1, 13 * 13 * 1024).detach().cpu().numpy(),
+                       fmt='%.15f', delimiter=',')
+            np.savetxt('cls_pred.csv',
+                       cls_score.view(-1, config.output_size * config.output_size * self.num_anchors *
+                                                self.num_classes).detach().cpu().numpy(),
+                       fmt='%.8f', delimiter=',')
+            self.first = False
         # print("prediction", prediction)
         # cls_out = self.classifier(p5)
         # cls_out = cls_out.view(-1, self.num_classes)

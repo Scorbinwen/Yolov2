@@ -14,7 +14,7 @@ from dataset import *
 
 train_dataloader, test_dataloader = GetDummyDataDataLoader()
 
-model = Yolov2()
+model = Yolov2(trainable=True)
 criterion = YoloLoss()
 optimizer = torch.optim.SGD(model.parameters(),
                       lr=config.learning_rate,
@@ -36,6 +36,9 @@ def train():
         checkpoint = torch.load(config.path_to_state_dict)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+    # for name, param in model.named_parameters():
+    #     print("name:{} param:{}".format(name, param))
     tmp_lr = config.learning_rate
     base_lr = config.learning_rate
     model.train(True)
@@ -60,6 +63,9 @@ def train():
             loss, noobj_loss, obj_loss, score_loss, true_loss_xy, true_loss_wh = criterion(
                 iter + epoch * len(train_dataloader), pred, target)
             loss.backward()
+            # for name, v in model.named_parameters():
+            #     if name == "backbone.conv_1.0.convs.0.weight":
+            #         print("name:{} grad:{}".format(name, v.grad))
             optimizer.step()
             optimizer.zero_grad()
             if (iter + epoch * len(train_dataloader)) % config.loss_print_period == 0:

@@ -47,35 +47,35 @@ class YoloLoss(nn.Module):
                 truebbox_index = -1
                 # 遍历所有 (N, W, H, anchor_num)个anchor，比较其与true_object 之间的iou，
                 # 实际上只有true_object和anchor的中心在同一个bin的时候，anchor才有可能成为正样本，其余anchor的标签一定不可能是该true_object.
-                for i, j in zip(true_object[..., 0].tolist(), true_object[..., 1].tolist()):
+                for i, j in zip(true_object[..., 1].tolist(), true_object[..., 0].tolist()):
                     truebbox_index = truebbox_index + 1
                     i = int(i)
                     j = int(j)
                     # 从anchor_num个anchor中选取最大的iou对应的predbox作为正样本
                     gt_bbox = torch.tensor([0, 0, true_object[truebbox_index, 2], true_object[truebbox_index, 3]])
-                    print("gt_bbox", gt_bbox)
+                    # print("gt_bbox", gt_bbox)
                     # 后续将该for循环改成矩阵运算，加快训练以及减小代码复杂度
                     for anchor_ind in range(self.anchor_num):
                         # anchor box的x, y 均为中心坐标。
                         anchor_bbox = torch.tensor(
                             [0, 0, config.anchor_box[anchor_ind][0], config.anchor_box[anchor_ind][1]])
-                        print("anchor_bbox", anchor_bbox)
+                        # print("anchor_bbox", anchor_bbox)
                         self.anchor_gt_iou[anchor_ind] = GetCenterAlignIouBetween(anchor_bbox, gt_bbox)
 
                     best_iou_index = torch.argmax(self.anchor_gt_iou)
-                    print("i:{} j:{} best_iou:{}".format(i, j, self.anchor_gt_iou[best_iou_index]))
+                    print("i:{} j:{} best_iou_index:{} best_iou:{}".format(i, j, best_iou_index, self.anchor_gt_iou[best_iou_index]))
                     # 将best_iou_index 对应的target设置为正样本。
                     self.true_bbox[b, i, j, best_iou_index, :] = true_object[truebbox_index, :]
-                    print("cls_score", cls_score[b, i, j, best_iou_index,:])
+                    # print("cls_score", cls_score[b, i, j, best_iou_index,:])
                     self.obj_mask[b, i, j, best_iou_index] = 1
-                    print("true_label", true_label.shape)
+                    # print("true_label", true_label.shape)
                     self.true_score[b, i, j, best_iou_index, :] = true_label[truebbox_index, :]
-                    print("pred_xy[b, i, j, best_iou_index]", pred_xy[b, i, j, best_iou_index])
+                    # print("pred_xy[b, i, j, best_iou_index]", pred_xy[b, i, j, best_iou_index])
                     self.pred_gt_iou[b, i, j, best_iou_index] = GetCenterAlignIouBetween(
                         torch.cat((pred_xy[b, i, j, best_iou_index], pred_wh[b, i, j, best_iou_index])),
                         true_object[truebbox_index, :])
-                    print("self.pred_gt_iou[b, i, j, best_iou_index]", self.pred_gt_iou[b, i, j, best_iou_index])
-                    print("conf[b, i, j, best_iou_index]", conf[b, i, j, best_iou_index])
+                    # print("self.pred_gt_iou[b, i, j, best_iou_index]", self.pred_gt_iou[b, i, j, best_iou_index])
+                    # print("conf[b, i, j, best_iou_index]", conf[b, i, j, best_iou_index])
                     self.scale_weight[b, i, j, best_iou_index] = \
                         2 - (true_object[truebbox_index, 2] / config.output_size) * \
                         (true_object[truebbox_index, 3] / config.output_size)
@@ -126,9 +126,10 @@ class YoloLoss(nn.Module):
                                           tmp_pred_wh, tmp_true_bbox[..., 2:])).sum() / self.batchsize
 
             cls_gt_mask = gt_mask.permute(0, 2, 1).contiguous()
+            index = torch.where(cls_gt_mask == 1)
+            print("index", index)
             _cls_gt_mask = gt_mask.permute(0, 2, 1).contiguous().squeeze(dim=1)
             index = torch.where(_cls_gt_mask == 1)
-            print("index", index)
             print("tmp_cls_score shape", tmp_cls_score.shape)
             print("tmp_cls_score", tmp_cls_score.permute(0, 2, 1)[index])
             print("tmp_true_score", tmp_true_score.permute(0, 2, 1)[index])
@@ -137,7 +138,8 @@ class YoloLoss(nn.Module):
             score_loss = (self.scale_obj * cls_gt_mask * self.cls_loss_function(tmp_cls_score, tmp_true_score)).sum() / self.batchsize
 
             total_loss = noobj_loss + obj_loss + true_loss_xy + true_loss_wh + score_loss
-
+            total_loss = score_loss
+            print("cls_loss:{}".format(score_loss))
         else:
             imagenet_label = []
             for b in range(self.batchsize):
