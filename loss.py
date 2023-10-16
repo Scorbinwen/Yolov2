@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from utils import GetCenterAlignIouBetween
 import config
+import numpy as np
 import torch.nn.functional as F
 
 
@@ -74,8 +75,8 @@ class YoloLoss(nn.Module):
                     self.pred_gt_iou[b, i, j, best_iou_index] = GetCenterAlignIouBetween(
                         torch.cat((pred_xy[b, i, j, best_iou_index], pred_wh[b, i, j, best_iou_index])),
                         true_object[truebbox_index, :])
-                    # print("self.pred_gt_iou[b, i, j, best_iou_index]", self.pred_gt_iou[b, i, j, best_iou_index])
-                    # print("conf[b, i, j, best_iou_index]", conf[b, i, j, best_iou_index])
+                    print("self.pred_gt_iou[b, i, j, best_iou_index]", self.pred_gt_iou[b, i, j, best_iou_index])
+                    print("conf[b, i, j, best_iou_index]", conf[b, i, j, best_iou_index])
                     self.scale_weight[b, i, j, best_iou_index] = \
                         2 - (true_object[truebbox_index, 2] / config.output_size) * \
                         (true_object[truebbox_index, 3] / config.output_size)
@@ -102,14 +103,16 @@ class YoloLoss(nn.Module):
             tmp_pred_gt_iou = self.pred_gt_iou.view(self.batchsize, self.fm_width*self.fm_height*self.anchor_num, 1).contiguous()
             tmp_scale_weight = self.scale_weight.view(self.batchsize, self.fm_width*self.fm_height*self.anchor_num, 1).contiguous()
             tmp_conf = conf.view(self.batchsize, self.fm_width*self.fm_height*self.anchor_num, 1).contiguous()
-            tmp_fm_cord = config.fm_cord.view(self.fm_width*self.fm_height, 2).repeat(1, self.anchor_num, 1).contiguous()
+            tmp_fm_cord = config.fm_cord.view(self.fm_width*self.fm_height, 1, 2).repeat(1, self.anchor_num, 1).view((self.fm_width*self.fm_height*self.anchor_num, 2)).contiguous()
             # objectness loss
-            print("tmp_conf max", torch.max(tmp_conf))
-            index_conf = torch.argmax(tmp_conf.squeeze())
-            print("index conf", index_conf)
-            index_mask = torch.argmax(tmp_obj_mask.squeeze())
-            print("index mask", index_mask)
+            # print("tmp_conf max", torch.max(tmp_conf))
+            # index_conf = torch.argmax(tmp_conf.squeeze())
+            # print("index conf", index_conf)
+            # index_mask = torch.argmax(tmp_obj_mask.squeeze())
+            # print("index mask", index_mask)
             # print("xy{} wh:{}".format(tmp_pred_xy[index], tmp_pred_wh[index]))
+            # np.set_printoptions(threshold=np.inf)
+            # print("tmp_conf:{}".format(tmp_conf))
             noobj_loss = (
                 self.scale_noobj * (tmp_obj_mask == 0) * self.conf_loss_function(tmp_conf, torch.zeros_like(tmp_conf))).sum() / self.batchsize
             obj_loss = (
@@ -138,8 +141,7 @@ class YoloLoss(nn.Module):
             score_loss = (self.scale_obj * cls_gt_mask * self.cls_loss_function(tmp_cls_score, tmp_true_score)).sum() / self.batchsize
 
             total_loss = noobj_loss + obj_loss + true_loss_xy + true_loss_wh + score_loss
-            total_loss = score_loss
-            print("cls_loss:{}".format(score_loss))
+            # print("cls_loss:{}".format(score_loss))
         else:
             imagenet_label = []
             for b in range(self.batchsize):
@@ -160,4 +162,4 @@ class YoloLoss(nn.Module):
             true_loss_wh = torch.tensor(0.)
             true_loss_xy = torch.tensor(0.)
 
-        return total_loss, noobj_loss / 4., obj_loss / 4., score_loss / 4., true_loss_xy / 4., true_loss_wh / 4.
+        return total_loss, noobj_loss, obj_loss, score_loss, true_loss_xy, true_loss_wh

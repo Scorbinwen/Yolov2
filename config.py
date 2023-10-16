@@ -52,7 +52,7 @@ anchor_train_epochs = 3
 # note that we assume the input_size equals to input_size
 downsample_rate = input_size // output_size
 loss_print_period = 10
-nms_iou_threshold = 0.5
+nms_iou_threshold = 0.4
 
 x = torch.arange(0, output_size, requires_grad=False, device="cuda")
 y = torch.arange(0, output_size, requires_grad=False, device="cuda")
@@ -63,11 +63,13 @@ path_to_state_dict = 'ModelPth/state_dict_model.pth'
 loss_print_period = 10
 default_device = "cuda"
 tensorboard_logs = './logs'
-train_epochs = 50
-lr_epoch=[10, 50]
+train_epochs = 200
+lr_epoch=[100, 150]
 wp_epoch=1
 weight_decay = 5e-4
 momentum = 0.9
+topk = 100
+score_threshold=0.001
 
 train_detection = True
 show_pred_every_iter = False

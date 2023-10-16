@@ -165,40 +165,76 @@ def RmvAtIndex(object_list, index):
 
 def NMSbyConf(pred):
     cls_score, pred_object = pred
-    print("pred_object conf max", torch.max(pred_object[..., 4]))
-    candiate_index = torch.where(pred_object[..., 4] > 0.8)
-    print("candiate_index", candiate_index)
-    max_score_index = torch.argmax(cls_score[candiate_index], dim=-1)
-    pred_object = pred_object[candiate_index]
-    result_object = []
-    result_class = []
-    for cls_ind in range(config.class_num):
-        same_cls_index = torch.where(max_score_index == cls_ind)
-        # object tensor list of the same class
-        same_cls_object = pred_object[same_cls_index]
-        same_cls_object = SortByConf(same_cls_object)
+    object_score = pred_object[..., 4]
 
-        while len(same_cls_object) > 0:
+    cls_score, labels = torch.max(torch.softmax(cls_score, dim=-1), dim=-1)
+    # print("labels", labels)
+    # print("cls_score", cls_score)
+    # print("object_score", object_score)
+    # (H x W x KA,)
+    labels = labels.flatten()
+    pred_scores = (cls_score * object_score).flatten()
+    pred_cord = pred_object[..., :4].view(-1, 4)
+
+    pred_prob, topk_idxs = pred_scores.sort(descending=True)
+    topk = min(config.topk, pred_scores.size(0))
+    # print("topk_idxs shape", topk_idxs.shape)
+    # print("pred_cord shape", pred_cord.shape)
+    # print("pred_cord", pred_cord[torch.tensor([0, 1, 2, 3, 4], device="cuda:0")])
+    # print("pred_cord[topk_idxs]", pred_cord[topk_idxs])
+
+
+
+    pred_cord = pred_cord[topk_idxs][:topk, ...]
+    # print("pred_cord", pred_cord)
+    pred_prob = pred_prob[:topk, ...]
+
+    # print("pred_prob", pred_prob)
+    topk_idxs = topk_idxs[:topk, ...]
+    # print("pred_prob", pred_prob)
+    # labels = topk_idxs % config.class_num
+
+    candiate_index = torch.where(pred_prob > config.score_threshold)
+    pred_cord = pred_cord[candiate_index]
+    labels = labels[candiate_index]
+    # print("pred_cord", pred_cord)
+    result_bbox = []
+    result_class = []
+    for cls_ind in range(config.class_num - 1):
+        same_cls_index = torch.where(labels == cls_ind)
+        # print("same_cls_index", same_cls_index)
+        # object tensor list of the same class
+        same_cls_bbox = pred_cord[same_cls_index]
+        # print("same_cls_bbox", same_cls_bbox)
+        # print("same_cls_bbox / 32", same_cls_bbox / 32)
+        # same_cls_bbox = SortByConf(same_cls_bbox)
+
+        while len(same_cls_bbox) > 0:
             # cherry_pick_object is the maximum
-            cherry_pick_object = same_cls_object[0, ...]
-            same_cls_object = RmvAtIndex(same_cls_object, 0)
-            for i, obj in enumerate(same_cls_object):
-                iou = GetIouBetween(cherry_pick_object[:4], obj[:4])
+            cherry_pick_bbox = same_cls_bbox[0, ...]
+            same_cls_bbox = RmvAtIndex(same_cls_bbox, 0)
+            loop_same_cls_bbox = same_cls_bbox
+            for i, bbox in enumerate(loop_same_cls_bbox):
+                iou = GetIouBetween(cherry_pick_bbox, bbox)
                 # suppression
+                # print("i:{} iou:{}".format(i, iou))
                 if iou > config.nms_iou_threshold:
                     # remove obj from same_cls_object
-                    same_cls_object = RmvAtIndex(same_cls_object, i)
-            # pick cherry_pick_object to result_object
-            result_object.append(cherry_pick_object)
+                    same_cls_bbox = RmvAtIndex(same_cls_bbox, i)
+            # pick cherry_pick_object to result_bbox
+            result_bbox.append(cherry_pick_bbox)
             result_class.append(cls_ind)
-    if len(result_object) == 0 or len(result_class) == 0:
+    if len(result_bbox) == 0 or len(result_class) == 0:
         return torch.tensor([]), torch.tensor([])
-    result_object = torch.stack(result_object)
+    result_bbox = torch.stack(result_bbox)
+    print("result_bbox", result_bbox)
+    print("result_bbox / 32", result_bbox / 32)
     result_class = torch.tensor(result_class)
-    return result_class, result_object
+    return result_class, result_bbox
 
 
 def MapPredCordBackToInputSize(pred_object):
+    pred_object[..., :2] = pred_object[..., :2].flip(dims=[-1])
     pred_object[..., :4] = pred_object[..., :4] * config.downsample_rate
     return pred_object
 
