@@ -234,7 +234,6 @@ def NMSbyConf(pred, target):
         result_object_score = torch.cat((result_object_score, same_cls_object_score[cherry_pick_indexs].unsqueeze(dim=-1)))
         result_cls_score = torch.cat((result_cls_score, same_cls_cls_score[cherry_pick_indexs].unsqueeze(dim=-1)))
 
-
     result = torch.cat((result_bbox, result_class, result_prob, result_object_score, result_cls_score), dim=-1)
     print("result", result)
     print("result // 32", result // 32)
@@ -250,18 +249,11 @@ def MapPredCordBackToInputSize(pred_object):
     return pred_object
 
 def RandomGenerateBbox(object_list):
-    # bbox size range from 1/4 * 416 = 104  to 3/8 * 416 = 156
-    # randomly generate circle
-    # randomly pick a size
     pick_size = random.randint(config.dummy_lower_limit, config.dummy_upper_limit)
-    # pick_size = 230
+
     pick_x = random.randint(pick_size // 2, config.input_size - pick_size // 2)
     pick_y = random.randint(pick_size // 2, config.input_size - pick_size // 2)
 
-    # pick_x = random.randint(192, 224)
-    # pick_y = random.randint(192, 224)
-    # pick_x = 240
-    # pick_y = 220
     iouflag = False
     # newly generated bbox should not be overlapped with previous bboxes
     for bbox in object_list:
