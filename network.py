@@ -266,10 +266,6 @@ class Yolov2(nn.Module):
                                                 self.num_classes).detach().cpu().numpy(),
                        fmt='%.8f', delimiter=',')
             self.first = False
-        # print("prediction", prediction)
-        # cls_out = self.classifier(p5)
-        # cls_out = cls_out.view(-1, self.num_classes)
-        # cls_out = self.softmax(cls_out)
         cls_out = None
         return conf, pred_xy, pred_wh, cls_score, cls_out
 

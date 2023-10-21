@@ -163,73 +163,84 @@ def RmvAtIndex(object_list, index):
     return torch.cat((object_list[:index, ...], object_list[(index + 1):, ...]), dim=0)
 
 
-def NMSbyConf(pred):
+def NMSbyConf(pred, target):
     cls_score, pred_object = pred
-    object_score = pred_object[..., 4]
+    _, true_label, true_object = target
 
+    object_score = pred_object[..., 4]
+    # print("torch.softmax(cls_score, dim=-1)", torch.softmax(cls_score, dim=-1))
+    # print("cls_score max", torch.max(torch.softmax(cls_score, dim=-1), dim=-1))
     cls_score, labels = torch.max(torch.softmax(cls_score, dim=-1), dim=-1)
-    # print("labels", labels)
-    # print("cls_score", cls_score)
-    # print("object_score", object_score)
     # (H x W x KA,)
-    labels = labels.flatten()
+
     pred_scores = (cls_score * object_score).flatten()
     pred_cord = pred_object[..., :4].view(-1, 4)
 
     pred_prob, topk_idxs = pred_scores.sort(descending=True)
     topk = min(config.topk, pred_scores.size(0))
-    # print("topk_idxs shape", topk_idxs.shape)
-    # print("pred_cord shape", pred_cord.shape)
-    # print("pred_cord", pred_cord[torch.tensor([0, 1, 2, 3, 4], device="cuda:0")])
-    # print("pred_cord[topk_idxs]", pred_cord[topk_idxs])
-
-
 
     pred_cord = pred_cord[topk_idxs][:topk, ...]
     # print("pred_cord", pred_cord)
+    cls_score = cls_score.flatten()
+    cls_score = cls_score[topk_idxs]
+    labels = labels.flatten()
+    labels = labels[topk_idxs]
+    cls_score = cls_score[:topk, ...]
+    object_score = object_score.flatten()
+    object_score = object_score[topk_idxs]
+    object_score = object_score[:topk, ...]
     pred_prob = pred_prob[:topk, ...]
-
-    # print("pred_prob", pred_prob)
-    topk_idxs = topk_idxs[:topk, ...]
-    # print("pred_prob", pred_prob)
-    # labels = topk_idxs % config.class_num
 
     candiate_index = torch.where(pred_prob > config.score_threshold)
     pred_cord = pred_cord[candiate_index]
     labels = labels[candiate_index]
-    # print("pred_cord", pred_cord)
-    result_bbox = []
-    result_class = []
+    pred_prob = pred_prob[candiate_index]
+    object_score = object_score[candiate_index]
+    cls_score = cls_score[candiate_index]
+
+    result_bbox = torch.empty(0, 4)
+    result_class = torch.empty(0, 1)
+    result_prob = torch.empty(0, 1)
+    result_object_score = torch.empty(0, 1)
+    result_cls_score = torch.empty(0, 1)
     for cls_ind in range(config.class_num - 1):
         same_cls_index = torch.where(labels == cls_ind)
         # print("same_cls_index", same_cls_index)
         # object tensor list of the same class
         same_cls_bbox = pred_cord[same_cls_index]
-        # print("same_cls_bbox", same_cls_bbox)
-        # print("same_cls_bbox / 32", same_cls_bbox / 32)
-        # same_cls_bbox = SortByConf(same_cls_bbox)
+        same_cls_pred_prob = pred_prob[same_cls_index]
+        same_cls_object_score = object_score[same_cls_index]
+        same_cls_cls_score = cls_score[same_cls_index]
 
-        while len(same_cls_bbox) > 0:
-            # cherry_pick_object is the maximum
-            cherry_pick_bbox = same_cls_bbox[0, ...]
-            same_cls_bbox = RmvAtIndex(same_cls_bbox, 0)
-            loop_same_cls_bbox = same_cls_bbox
+        # 得到相同类别的cherry_pick的index
+        rest_indexs = [i for i in range(0, same_cls_bbox.size(0))]
+        cherry_pick_indexs = []
+        while len(rest_indexs) > 0:
+            cherry_pick_bbox = same_cls_bbox[rest_indexs[0]]
+            cherry_pick_indexs.append(rest_indexs[0])
+
+            loop_same_cls_bbox = same_cls_bbox[rest_indexs]
+            remove_indexs = []
             for i, bbox in enumerate(loop_same_cls_bbox):
                 iou = GetIouBetween(cherry_pick_bbox, bbox)
-                # suppression
-                # print("i:{} iou:{}".format(i, iou))
                 if iou > config.nms_iou_threshold:
-                    # remove obj from same_cls_object
-                    same_cls_bbox = RmvAtIndex(same_cls_bbox, i)
-            # pick cherry_pick_object to result_bbox
-            result_bbox.append(cherry_pick_bbox)
-            result_class.append(cls_ind)
-    if len(result_bbox) == 0 or len(result_class) == 0:
+                    remove_indexs.append(i)
+            rest_indexs = list(filter(lambda ind: ind not in remove_indexs, rest_indexs))
+
+        cherry_pick_same_cls_box = same_cls_bbox[cherry_pick_indexs]
+        result_bbox = torch.cat((result_bbox, cherry_pick_same_cls_box))
+        result_class = torch.cat((result_class, torch.ones(cherry_pick_same_cls_box.shape[:-1]+(1,)) * cls_ind))
+        result_prob = torch.cat((result_prob, same_cls_pred_prob[cherry_pick_indexs].unsqueeze(dim=-1)))
+        result_object_score = torch.cat((result_object_score, same_cls_object_score[cherry_pick_indexs].unsqueeze(dim=-1)))
+        result_cls_score = torch.cat((result_cls_score, same_cls_cls_score[cherry_pick_indexs].unsqueeze(dim=-1)))
+
+
+    result = torch.cat((result_bbox, result_class, result_prob, result_object_score, result_cls_score), dim=-1)
+    print("result", result)
+    print("result // 32", result // 32)
+    if len(result_bbox) == 0:
         return torch.tensor([]), torch.tensor([])
-    result_bbox = torch.stack(result_bbox)
-    print("result_bbox", result_bbox)
-    print("result_bbox / 32", result_bbox / 32)
-    result_class = torch.tensor(result_class)
+
     return result_class, result_bbox
 
 
@@ -268,13 +279,14 @@ def GetTargetToShow(target):
     return true_label, _true_object
 
 
-def DrawWithPredResult(pred, image):
+def DrawWithPredResult(pred, image, target):
     conf, pred_xy, pred_wh, cls_score, cls_out = pred
+    _, true_label, true_object = target[0]
     cls_score_to_show = cls_score[0, ...]
     image_to_show = image[0]
     pred_object_to_show = torch.cat((pred_xy[0, ...], pred_wh[0, ...], conf[0, ...]), dim=-1)
     pred_object_to_show = MapPredCordBackToInputSize(pred_object_to_show)
     pred_to_show = cls_score_to_show, pred_object_to_show
-    target = NMSbyConf(pred_to_show)
-    img = DrawWithPred(image_to_show, target)
+    result = NMSbyConf(pred_to_show, target[0])
+    img = DrawWithPred(image_to_show, result)
     return img

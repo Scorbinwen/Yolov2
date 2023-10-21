@@ -97,12 +97,12 @@ def eval():
         print("loading model state dict...")
         checkpoint = torch.load(config.path_to_state_dict)
         model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
+    model.train()
     with torch.no_grad():
         for iter, (image, target) in enumerate(test_dataloader):
             with torch.no_grad():
                 pred = model(image)
-                img = DrawWithPredResult(pred, image)
+                img = DrawWithPredResult(pred, image, target)
                 # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
                 ShowImageWbnd(img)
 

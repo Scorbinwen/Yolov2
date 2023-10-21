@@ -62,12 +62,20 @@ class YoloLoss(nn.Module):
                             [0, 0, config.anchor_box[anchor_ind][0], config.anchor_box[anchor_ind][1]])
                         # print("anchor_bbox", anchor_bbox)
                         self.anchor_gt_iou[anchor_ind] = GetCenterAlignIouBetween(anchor_bbox, gt_bbox)
-
+                        for x_delta in range(-1, 2):
+                            for y_delta in range(-1, 2):
+                                x = i + x_delta
+                                y = j + y_delta
+                                if (x >= 0) and (x < 13) and (y >= 0) and (y < 13):
+                                    scr = torch.softmax(cls_score[b, x, y, anchor_ind, :], dim=-1)
+                                    obj_conf = conf[b, x, y, anchor_ind]
+                                    print("x:{} y:{} cls_score:{} conf:{} prob:{}".format(x, y, scr, obj_conf, torch.max(scr) * obj_conf))
+                    print("=========================================")
                     best_iou_index = torch.argmax(self.anchor_gt_iou)
                     print("i:{} j:{} best_iou_index:{} best_iou:{}".format(i, j, best_iou_index, self.anchor_gt_iou[best_iou_index]))
                     # 将best_iou_index 对应的target设置为正样本。
                     self.true_bbox[b, i, j, best_iou_index, :] = true_object[truebbox_index, :]
-                    # print("cls_score", cls_score[b, i, j, best_iou_index,:])
+
                     self.obj_mask[b, i, j, best_iou_index] = 1
                     # print("true_label", true_label.shape)
                     self.true_score[b, i, j, best_iou_index, :] = true_label[truebbox_index, :]
@@ -84,9 +92,10 @@ class YoloLoss(nn.Module):
                     for anchor_ind in range(self.anchor_num):
                         if anchor_ind != best_iou_index:
                             if self.anchor_gt_iou[anchor_ind] > self.iou_threshold:
-                                # 这些超过iou阈值的anchor box不加入训练，主要目的是为了将anchor bbox分化成不同的anchor size。
+                                # 这些超过iou阈值的anchor box不加入训练，主要目的是为了将anchor bbox分化成不同的anchor size，但是类别相同
                                 self.obj_mask[b, i, j, anchor_ind] = -1
                                 self.scale_weight[b, i, j, anchor_ind] = -1
+                                self.true_score[b, i, j, anchor_ind] = true_label[truebbox_index, :]
                             else:
                                 # 取iou最大的，其余为负样本。
                                 self.obj_mask[b, i, j, anchor_ind] = 0
@@ -129,16 +138,16 @@ class YoloLoss(nn.Module):
                                           tmp_pred_wh, tmp_true_bbox[..., 2:])).sum() / self.batchsize
 
             cls_gt_mask = gt_mask.permute(0, 2, 1).contiguous()
-            index = torch.where(cls_gt_mask == 1)
+            index = torch.where((cls_gt_mask == 1) | (cls_gt_mask == -1))
             print("index", index)
             _cls_gt_mask = gt_mask.permute(0, 2, 1).contiguous().squeeze(dim=1)
-            index = torch.where(_cls_gt_mask == 1)
+            index = torch.where((_cls_gt_mask == 1) | (_cls_gt_mask == -1))
             print("tmp_cls_score shape", tmp_cls_score.shape)
-            print("tmp_cls_score", tmp_cls_score.permute(0, 2, 1)[index])
+            print("tmp_cls_score", torch.softmax(tmp_cls_score.permute(0, 2, 1)[index], dim=-1))
             print("tmp_true_score", tmp_true_score.permute(0, 2, 1)[index])
             print("pred result", torch.argmax(tmp_cls_score.permute(0, 2, 1)[index], dim=-1) == torch.argmax(tmp_true_score.permute(0, 2, 1)[index], dim=-1))
 
-            score_loss = (self.scale_obj * cls_gt_mask * self.cls_loss_function(tmp_cls_score, tmp_true_score)).sum() / self.batchsize
+            score_loss = (self.scale_obj * ((cls_gt_mask == 1) | (cls_gt_mask == -1)) * self.cls_loss_function(tmp_cls_score, tmp_true_score)).sum() / self.batchsize
 
             total_loss = noobj_loss + obj_loss + true_loss_xy + true_loss_wh + score_loss
             # print("cls_loss:{}".format(score_loss))

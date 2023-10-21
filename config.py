@@ -69,7 +69,7 @@ wp_epoch=1
 weight_decay = 5e-4
 momentum = 0.9
 topk = 100
-score_threshold=0.001
+score_threshold=0.01
 
 train_detection = True
 show_pred_every_iter = False
