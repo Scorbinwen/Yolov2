@@ -1,3 +1,5 @@
+import os.path
+
 import torch.nn as nn
 from collections import OrderedDict
 import config
@@ -141,7 +143,7 @@ def build_darknet19(pretrained=False):
     feat_dims = [256, 512, 1024]
 
     # load weight
-    if pretrained:
+    if pretrained and os.path.exists(config.backbone_state_dict):
         print('Loading pretrained weight ...')
         # checkpoint state dict
         checkpoint_state_dict = torch.load(config.backbone_state_dict)

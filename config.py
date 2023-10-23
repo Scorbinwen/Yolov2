@@ -8,6 +8,13 @@ NameToClsId = \
      'diningtable': 10, 'dog': 11, 'horse': 12, 'motorbike': 13, 'person': 14,
      'pottedplant': 15, 'sheep': 16, 'sofa': 17, 'train': 18, 'tvmonitor': 19}
 
+VOC_CLASSES = (  # always index 0
+    'aeroplane', 'bicycle', 'bird', 'boat',
+    'bottle', 'bus', 'car', 'cat', 'chair',
+    'cow', 'diningtable', 'dog', 'horse',
+    'motorbike', 'person', 'pottedplant',
+    'sheep', 'sofa', 'train', 'tvmonitor')
+
 ClsIdToName = \
     {0: 'aeroplane', 1: 'bicycle', 2: 'bird', 3: 'boat', 4: 'bottle',
      5: 'bus', 6: 'car', 7: 'cat', 8: 'chair', 9: 'cow',
@@ -43,10 +50,11 @@ if is_dummydata:
          [start_size + 4 * step, start_size + 4 * step]]
 else:
     anchor_box = \
-        [[0.08285376, 0.13705531],
-         [0.20850361, 0.39420716],
-         [0.80552421, 0.77665105],
-         [0.42194719, 0.62385487]]
+        [[1.19, 1.98],
+         [2.79, 4.59],
+         [4.53, 8.92],
+         [8.06, 5.29],
+         [10.32, 10.65]],
 
 anchor_train_epochs = 3
 # note that we assume the input_size equals to input_size

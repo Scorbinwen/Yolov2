@@ -162,10 +162,29 @@ def SortByConf(same_cls_object):
 def RmvAtIndex(object_list, index):
     return torch.cat((object_list[:index, ...], object_list[(index + 1):, ...]), dim=0)
 
-
+def CalcmAp(pred_result, true_target):
+    result_bbox, result_class = pred_result
+    true_bbox, true_label = true_target
+    avg_precision_list = []
+    avg_recall_list = []
+    for cls_ind in true_label:
+        true_bbox_map_indexs = torch.ones(true_bbox.size(0)) * -1
+        for i, tgt_bbox in enumerate(true_bbox):
+            for j, pred_bbox in enumerate(result_bbox):
+                iou = GetIouBetween(tgt_bbox, pred_bbox)
+                if (iou > 0.7):
+                    true_bbox_map_indexs[i] = j
+        false_neg = torch.sum(true_bbox_map_indexs == -1)
+        true_pos = true_bbox_map_indexs.size(0) - false_neg
+        false_pos = result_bbox.size(0) - true_pos
+        avg_precision = true_pos / (true_pos + false_pos)
+        avg_precision_list.append(avg_precision)
+        avg_recall = true_pos / (true_pos + false_neg)
+        avg_recall_list.append(avg_recall)
+    mAp = avg_recall_list
 def NMSbyConf(pred, target):
     cls_score, pred_object = pred
-    _, true_label, true_object = target
+    _, true_label, true_bbox = target
 
     object_score = pred_object[..., 4]
     # print("torch.softmax(cls_score, dim=-1)", torch.softmax(cls_score, dim=-1))
@@ -235,8 +254,12 @@ def NMSbyConf(pred, target):
         result_cls_score = torch.cat((result_cls_score, same_cls_cls_score[cherry_pick_indexs].unsqueeze(dim=-1)))
 
     result = torch.cat((result_bbox, result_class, result_prob, result_object_score, result_cls_score), dim=-1)
+    pred_result = result_bbox, result_class
+    true_target = true_bbox, torch.argmax(true_label, -1, keepdim=True)
+
+    CalcmAp(pred_result, true_target)
+
     print("result", result)
-    print("result // 32", result // 32)
     if len(result_bbox) == 0:
         return torch.tensor([]), torch.tensor([])
 

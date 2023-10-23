@@ -5,6 +5,7 @@ from network import *
 import config
 import signal
 from utils import *
+from evaluater import *
 from torch.utils.tensorboard import SummaryWriter
 
 writer = SummaryWriter(config.tensorboard_logs)
@@ -12,7 +13,7 @@ writer = SummaryWriter(config.tensorboard_logs)
 torch.set_default_device(config.default_device)
 from dataset import *
 
-train_dataloader, test_dataloader = GetDummyDataDataLoader()
+train_dataloader, test_dataloader = GetVOCDetectionDataLoader()
 
 model = Yolov2(trainable=True)
 criterion = YoloLoss()
@@ -98,6 +99,23 @@ def eval():
         checkpoint = torch.load(config.path_to_state_dict)
         model.load_state_dict(checkpoint['model_state_dict'])
     model.train()
+    pixel_mean = (0.406, 0.456, 0.485)  # BGR
+    pixel_std = (0.225, 0.224, 0.229)   # BGR
+    val_transform = BaseTransform(config.input_size, pixel_mean, pixel_std)
+    evaluator = VOCAPIEvaluator(
+        data_root=config.data_root,
+        img_size=config.input_size,
+        device=torch.device(config.default_device),
+        transform=val_transform
+    )
+    evaluator.evaluate(model)
+
+def visual():
+    if os.path.exists(config.path_to_state_dict):
+        print("loading model state dict...")
+        checkpoint = torch.load(config.path_to_state_dict)
+        model.load_state_dict(checkpoint['model_state_dict'])
+    model.train()
     with torch.no_grad():
         for iter, (image, target) in enumerate(test_dataloader):
             with torch.no_grad():
@@ -105,5 +123,4 @@ def eval():
                 img = DrawWithPredResult(pred, image, target)
                 # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
                 ShowImageWbnd(img)
-
-train()
+visual()
