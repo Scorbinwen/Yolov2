@@ -123,4 +123,4 @@ def visual():
                 img = DrawWithPredResult(pred, image, target)
                 # writer.add_image("pred_result", img, global_step=None, walltime=None, dataformats='CHW')
                 ShowImageWbnd(img)
-visual()
+train()
