@@ -3,10 +3,10 @@
 学习Yolov2算法，以及探究深度学习算法调试手段
 
 ## 结果
-| | training set | test set | mAP@416 | |
-| :--: | :--: | :--: | :--: | :--: ||
-|this repo|VOC2007+2012|VOC2007|72.7||
-|original paper|VOC2007+2012|VOC2007|76.8||
+| | training set | test set | mAP@416 | 
+| :--: | :--: | :--: | :--: | 
+|this repo|VOC2007+2012|VOC2007|72.7|
+|original paper|VOC2007+2012|VOC2007|76.8|
 Running time: ~19ms (52FPS) on GTX 1080
 
 ## 训练Yolov2:
