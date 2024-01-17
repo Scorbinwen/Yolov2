@@ -1,4 +1,6 @@
 # Yolov2 Implementation
+## 目的
+学习Yolov2算法，以及探究深度学习算法调试手段
 
 ## 结果
 | | training set | test set | mAP@416 | mAP@544 |
