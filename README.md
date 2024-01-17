@@ -1,5 +1,12 @@
-# Yolov2
-Yolov2 pytorch实现，持续更新中。。。
+# Yolov2 Implementation
+
+## 结果
+| | training set | test set | mAP@416 | mAP@544 |
+| :--: | :--: | :--: | :--: | :--: |
+|this repo|VOC2007+2012|VOC2007|72.7|74.6|
+|original paper|VOC2007+2012|VOC2007|76.8|78.6|
+Running time: ~19ms (52FPS) on GTX 1080
+
 ## 训练Yolov2:
 执行train.py
 ## 测试Yolov2:
