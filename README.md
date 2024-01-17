@@ -10,7 +10,7 @@
 Running time: ~19ms (52FPS) on GTX 1080
 
 ## 训练Yolov2:
-执行train.py
+执行train.py --m
 ## 测试Yolov2:
 执行eval.py
 ## 在tensorboard上查看损失函数和预测结果：
